@@ -14,6 +14,7 @@ torch == 1.2.0
 训练所需的voc_weights_resnet.pth或者voc_weights_vgg.pth可以在百度云下载。  
 voc_weights_resnet.pth是resnet为主干特征提取网络用到的；  
 voc_weights_vgg.pth是vgg为主干特征提取网络用到的；  
+链接: https://pan.baidu.com/s/1H_YQxUvGrOXQeEQWPJvixQ 提取码: 9eai   
 
 ### 训练步骤
 1、本文使用VOC格式进行训练。  
