@@ -35,8 +35,8 @@ class FRCNN(object):
         self.__dict__.update(self._defaults)
         self.class_names = self._get_class()
         self.generate()
-        self.mean = torch.Tensor([0,0,0,0]).cuda().repeat(21)[None]
-        self.std = torch.Tensor([0.1, 0.1, 0.2, 0.2]).cuda().repeat(21)[None]
+        self.mean = torch.Tensor([0,0,0,0]).cuda().repeat(self.num_classes+1)[None]
+        self.std = torch.Tensor([0.1, 0.1, 0.2, 0.2]).cuda().repeat(self.num_classes+1)[None]
 
     #---------------------------------------------------#
     #   获得所有的分类
