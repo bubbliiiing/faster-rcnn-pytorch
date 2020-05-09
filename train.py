@@ -85,28 +85,29 @@ if __name__ == "__main__":
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
     
-    # if True:
-    #     lr = 1e-4
-    #     Init_Epoch = 0
-    #     Freeze_Epoch = 25
+
+    if True:
+        lr = 1e-4
+        Init_Epoch = 0
+        Freeze_Epoch = 25
         
-    #     optimizer = optim.Adam(model.parameters(),lr)
-    #     lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+        optimizer = optim.Adam(model.parameters(),lr)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
-    #     gen = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
-    #     gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
+        gen = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
+        gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
                         
-    #     epoch_size = EPOCH_LENGTH
-    #     epoch_size_val = int(EPOCH_LENGTH/10)
-    #     # ------------------------------------#
-    #     #   冻结一定部分训练
-    #     # ------------------------------------#
-    #     for param in model.extractor.parameters():
-    #         param.requires_grad = False
+        epoch_size = EPOCH_LENGTH
+        epoch_size_val = int(EPOCH_LENGTH/10)
+        # ------------------------------------#
+        #   冻结一定部分训练
+        # ------------------------------------#
+        for param in model.extractor.parameters():
+            param.requires_grad = False
 
-    #     for epoch in range(Init_Epoch,Freeze_Epoch):
-    #         fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch)
-    #         lr_scheduler.step()
+        for epoch in range(Init_Epoch,Freeze_Epoch):
+            fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch)
+            lr_scheduler.step()
 
     if True:
         lr = 1e-5
