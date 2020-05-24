@@ -21,8 +21,8 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
         imgs,boxes,labels = next(gen)
         with torch.no_grad():
             imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
-            boxes = [Variable(torch.from_numpy(box).cuda().type(torch.FloatTensor)) for box in boxes]
-            labels = [Variable(torch.from_numpy(label).cuda().type(torch.FloatTensor)) for label in labels]
+            boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
+            labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
         losses = train_util.train_step(imgs, boxes, labels, 1)
         rpn_loc, rpn_cls, roi_loc, roi_cls, total = losses
         total_loss += total
@@ -54,7 +54,6 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
 
     print('Saving state, iter:', str(epoch+1))
     torch.save(model.state_dict(), 'logs/Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth'%((epoch+1),total_loss/(epoch_size+1),val_toal_loss/(epoch_size_val+1)))
-
 
 if __name__ == "__main__":
     # 参数初始化
