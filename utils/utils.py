@@ -99,10 +99,10 @@ class DecodeBox():
         cls_bbox = torch.Tensor(cls_bbox)
         cls_bbox = cls_bbox.view([-1, (self.num_classes), 4])
         # clip bounding box
-        cls_bbox[:, 0] = (cls_bbox[:, 0]).clamp(min=0, max=width)
-        cls_bbox[:, 2] = (cls_bbox[:, 2]).clamp(min=0, max=width)
-        cls_bbox[:, 1] = (cls_bbox[:, 1]).clamp(min=0, max=height)
-        cls_bbox[:, 3] = (cls_bbox[:, 3]).clamp(min=0, max=height)
+        cls_bbox[..., 0] = (cls_bbox[..., 0]).clamp(min=0, max=width)
+        cls_bbox[..., 2] = (cls_bbox[..., 2]).clamp(min=0, max=width)
+        cls_bbox[..., 1] = (cls_bbox[..., 1]).clamp(min=0, max=height)
+        cls_bbox[..., 3] = (cls_bbox[..., 3]).clamp(min=0, max=height)
 
         prob = F.softmax(torch.tensor(roi_scores), dim=1)
         raw_cls_bbox = cls_bbox.cpu().numpy()
