@@ -91,7 +91,7 @@ if __name__ == "__main__":
         Freeze_Epoch = 25
         
         optimizer = optim.Adam(model.parameters(),lr)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
 
         gen = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
         gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         Freeze_Epoch = 25
         Unfreeze_Epoch = 50
         optimizer = optim.Adam(model.parameters(),lr)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
 
         gen = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
         gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
