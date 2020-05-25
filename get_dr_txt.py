@@ -17,7 +17,6 @@ from nets.frcnn_training import get_new_img_size
 from PIL import Image, ImageFont, ImageDraw
 import copy
 
-MEANS = (104, 117, 123)
 class mAP_FRCNN(FRCNN):
     #---------------------------------------------------#
     #   检测图片
@@ -52,7 +51,7 @@ class mAP_FRCNN(FRCNN):
         bbox = np.array(bbox,np.int32)
         for i, c in enumerate(label):
             predicted_class = self.class_names[int(c)]
-            score = conf[i]
+            score = str(conf[i])
 
             left, top, right, bottom = bbox[i]
             f.write("%s %s %s %s %s %s\n" % (predicted_class, score[:6], str(int(left)), str(int(top)), str(int(right)),str(int(bottom))))
