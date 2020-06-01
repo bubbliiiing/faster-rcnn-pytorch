@@ -84,24 +84,24 @@ class FRCNN(object):
         image = image.resize([width,height])
         photo = np.array(image,dtype = np.float32)/255
         photo = np.transpose(photo, (2, 0, 1))
-        
-        images = []
-        images.append(photo)
-        images = np.asarray(images)
-        images = torch.from_numpy(images).cuda()
+        with torch.no_grad():
+            images = []
+            images.append(photo)
+            images = np.asarray(images)
+            images = torch.from_numpy(images).cuda()
 
-        roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
-        decodebox = DecodeBox(self.std, self.mean, self.num_classes)
-        outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height=height, width=width, score_thresh = self.confidence)
-        if len(outputs)==0:
-            return old_image
-        bbox = outputs[:,:4]
-        conf = outputs[:, 4]
-        label = outputs[:, 5]
+            roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
+            decodebox = DecodeBox(self.std, self.mean, self.num_classes)
+            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height=height, width=width, score_thresh = self.confidence)
+            if len(outputs)==0:
+                return old_image
+            bbox = outputs[:,:4]
+            conf = outputs[:, 4]
+            label = outputs[:, 5]
 
-        bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
-        bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
-        bbox = np.array(bbox,np.int32)
+            bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
+            bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
+            bbox = np.array(bbox,np.int32)
         image = old_image
         thickness = (np.shape(old_image)[0] + np.shape(old_image)[1]) // old_width*2
         font = ImageFont.truetype(font='model_data/simhei.ttf',size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
