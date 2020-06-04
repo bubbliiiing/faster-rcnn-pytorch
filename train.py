@@ -16,9 +16,12 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
     roi_loc_loss = 0
     roi_cls_loss = 0
     val_toal_loss = 0
-    for iteration in range(epoch_size):
+    for iteration, batch in enumerate(gen):
+        if iteration >= epoch_size:
+            break
         start_time = time.time()
-        imgs,boxes,labels = next(gen)
+        imgs,boxes,labels = batch[0], batch[1], batch[2]
+
         with torch.no_grad():
             imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
             boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
@@ -37,8 +40,10 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
             % (total_loss/(iteration+1), rpn_loc_loss/(iteration+1),rpn_cls_loss/(iteration+1),roi_loc_loss/(iteration+1),roi_cls_loss/(iteration+1),waste_time))
 
     print('Start Validation')
-    for iteration in range(epoch_size_val):
-        imgs,boxes,labels = next(genval)
+    for iteration, batch in enumerate(genval):
+        if iteration >= epoch_size_val:
+            break
+        imgs,boxes,labels = batch[0], batch[1], batch[2]
         with torch.no_grad():
             imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
             boxes = Variable(torch.from_numpy(boxes).type(torch.FloatTensor)).cuda()
