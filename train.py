@@ -65,8 +65,9 @@ if __name__ == "__main__":
     model = FasterRCNN(NUM_CLASSES,backbone=BACKBONE).cuda()
 
     print('Loading weights into state dict...')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_dict = model.state_dict()
-    pretrained_dict = torch.load("model_data/voc_weights_resnet.pth")
+    pretrained_dict = torch.load("model_data/voc_weights_resnet.pth", map_location=device)
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if np.shape(model_dict[k]) ==  np.shape(v)}
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
