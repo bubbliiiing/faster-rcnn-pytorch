@@ -13,6 +13,10 @@ from PIL import Image, ImageFont, ImageDraw
 import copy
 import math
 
+#--------------------------------------------#
+#   使用自己训练好的模型预测需要修改2个参数
+#   model_path和classes_path都需要修改！
+#--------------------------------------------#
 class FRCNN(object):
     _defaults = {
         "model_path": 'model_data/voc_weights_resnet.pth',
