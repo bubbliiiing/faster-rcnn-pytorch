@@ -69,6 +69,9 @@ if __name__ == "__main__":
     BACKBONE = "resnet50"
     model = FasterRCNN(NUM_CLASSES,backbone=BACKBONE).cuda()
 
+    #-------------------------------------------#
+    #   权值文件的下载请看README
+    #-------------------------------------------#
     print('Loading weights into state dict...')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_dict = model.state_dict()
