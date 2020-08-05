@@ -30,7 +30,7 @@ while(True):
     frame = cv2.putText(frame, "fps= %.2f"%(fps), (0, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     cv2.imshow("video",frame)
-    c= cv2.waitKey(30) & 0xff 
+    c= cv2.waitKey(1) & 0xff 
     if c==27:
         capture.release()
         break
