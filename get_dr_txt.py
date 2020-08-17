@@ -41,7 +41,7 @@ class mAP_FRCNN(FRCNN):
             decodebox = DecodeBox(self.std, self.mean, self.num_classes)
             outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height=height, width=width, score_thresh = self.confidence)
             if len(outputs)==0:
-                return old_image
+                return 
             bbox = outputs[:,:4]
             conf = outputs[:, 4]
             label = outputs[:, 5]
