@@ -27,7 +27,7 @@ img/street.jpg
 b、利用video.py可进行摄像头检测。  
 #### 2、使用自己训练的权重
 a、按照训练步骤训练。  
-b、在ssd.py文件里面，在如下部分修改model_path、backbone和classes_path使其对应训练好的文件；**model_path对应logs文件夹下面的权值文件，backbone对应主干特征提取网络的种类，classes_path是model_path对应分的类**。  
+b、在frcnn.py文件里面，在如下部分修改model_path、backbone和classes_path使其对应训练好的文件；**model_path对应logs文件夹下面的权值文件，backbone对应主干特征提取网络的种类，classes_path是model_path对应分的类**。  
 ```python
 _defaults = {
     "model_path": 'model_data/voc_weights_resnet.pth',
