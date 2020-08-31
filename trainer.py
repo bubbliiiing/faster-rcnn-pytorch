@@ -108,7 +108,6 @@ class FasterRCNNTrainer(nn.Module):
 
         losses = [rpn_loc_loss, rpn_cls_loss, roi_loc_loss, roi_cls_loss]
         losses = losses + [sum(losses)]
-
         return LossTuple(*losses)
 
     def train_step(self, imgs, bboxes, labels, scale):
@@ -137,5 +136,5 @@ def _fast_rcnn_loc_loss(pred_loc, gt_loc, gt_label, sigma):
     # smooth_l1损失函数
     loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
     # 进行标准化
-    loc_loss /= ((gt_label >= 0).sum().float()+1)
+    loc_loss /= ((gt_label >= 0).sum().float())
     return loc_loss

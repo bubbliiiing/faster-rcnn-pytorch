@@ -3,7 +3,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from utils.anchors import generate_anchor_base,_enumerate_shifted_anchor
-from utils.utils import nms,loc2bbox
+from utils.utils import loc2bbox
+from torchvision.ops import nms
 import numpy as np
 
 
@@ -12,9 +13,9 @@ class ProposalCreator():
     def __init__(self,
                  mode,
                  nms_thresh=0.7,
-                 n_train_pre_nms=3000,
-                 n_train_post_nms=300,
-                 n_test_pre_nms=3000,
+                 n_train_pre_nms=12000,
+                 n_train_post_nms=2000,
+                 n_test_pre_nms=6000,
                  n_test_post_nms=300,
                  min_size=16
                  ):
@@ -28,12 +29,14 @@ class ProposalCreator():
 
     def __call__(self, loc, score,
                  anchor, img_size, scale=1.):
+
         if self.mode == "training":
             n_pre_nms = self.n_train_pre_nms
             n_post_nms = self.n_train_post_nms
         else:
             n_pre_nms = self.n_test_pre_nms
             n_post_nms = self.n_test_post_nms
+
         # 将RPN网络预测结果转化成建议框
         roi = loc2bbox(anchor, loc)
 
@@ -50,14 +53,21 @@ class ProposalCreator():
         keep = np.where((hs >= min_size) & (ws >= min_size))[0]
         roi = roi[keep, :]
         score = score[keep]
+
         # 取出成绩最好的一些建议框
         order = score.ravel().argsort()[::-1]
         if n_pre_nms > 0:
             order = order[:n_pre_nms]
         roi = roi[order, :]
-        roi = nms(roi,self.nms_thresh)
-        roi = torch.Tensor(roi)
-        roi = roi[:n_post_nms]
+        score = score[order]
+
+        keep = nms(
+            torch.from_numpy(roi).cuda(), 
+            torch.from_numpy(score).cuda(), 
+            self.nms_thresh
+        )
+        keep = keep[:n_post_nms]
+        roi = roi[keep.cpu().numpy()]
         return roi
 
 

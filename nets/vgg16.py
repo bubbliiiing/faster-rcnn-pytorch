@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-
+import torchvision
+from torchvision.models.utils import load_state_dict_from_url
 cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
 #--------------------------------------#
 #   VGG16的结构
@@ -70,6 +71,10 @@ def make_layers(cfg, batch_norm=False):
 
 def decom_vgg16():
     model = VGG(make_layers(cfg))
+
+    state_dict = load_state_dict_from_url("https://download.pytorch.org/models/vgg16-397923af.pth")
+    model.load_state_dict(state_dict)
+    
     # 获取特征提取部分
     features = list(model.features)[:30]
     # 获取分类部分

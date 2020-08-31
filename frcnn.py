@@ -62,6 +62,7 @@ class FRCNN(object):
         # 载入模型，如果原来的模型里已经包括了模型结构则直接载入。
         # 否则先构建模型再载入
         self.model = FasterRCNN(self.num_classes,"predict",backbone=self.backbone).cuda()
+        self.model = self.model.eval()
         self.model.load_state_dict(torch.load(self.model_path))
         cudnn.benchmark = True
                 

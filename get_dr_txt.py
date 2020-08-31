@@ -49,6 +49,7 @@ class mAP_FRCNN(FRCNN):
             bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
             bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
             bbox = np.array(bbox,np.int32)
+            
         for i, c in enumerate(label):
             predicted_class = self.class_names[int(c)]
             score = str(conf[i])

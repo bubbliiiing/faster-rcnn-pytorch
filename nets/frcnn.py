@@ -22,7 +22,7 @@ class FasterRCNN(nn.Module):
         self.loc_normalize_std = loc_normalize_std
         self.feat_stride = feat_stride
         if backbone == 'vgg':
-            self.extractor, self.classifier = decom_vgg16()
+            self.extractor, classifier = decom_vgg16()
             self.rpn = RegionProposalNetwork(
                 512, 512,
                 ratios=ratios,
@@ -34,10 +34,10 @@ class FasterRCNN(nn.Module):
                 n_class=num_classes + 1,
                 roi_size=7,
                 spatial_scale=(1. / self.feat_stride),
-                classifier=self.classifier
+                classifier=classifier
             )
         elif backbone == 'resnet50':
-            self.extractor, self.classifier = resnet50()
+            self.extractor, classifier = resnet50()
 
             self.rpn = RegionProposalNetwork(
                 1024, 512,
@@ -50,7 +50,7 @@ class FasterRCNN(nn.Module):
                 n_class=num_classes + 1,
                 roi_size=14,
                 spatial_scale=(1. / self.feat_stride),
-                classifier=self.classifier
+                classifier=classifier
             )
     def forward(self, x, scale=1.):
         img_size = x.shape[2:]

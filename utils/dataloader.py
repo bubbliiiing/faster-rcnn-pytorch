@@ -1,31 +1,28 @@
-
-import random
-import numpy as np
 from random import shuffle
-from PIL import Image
-from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+import numpy as np
+import torch
+import torch.nn as nn
+import math
 import cv2
-def rand(a=0, b=1):
-    return np.random.rand()*(b-a) + a
+import torch.nn.functional as F
+from PIL import Image
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import Dataset
+from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
 
-def get_new_img_size(width, height, img_min_side=600):
-    if width <= height:
-        f = float(img_min_side) / width
-        resized_height = int(f * height)
-        resized_width = int(img_min_side)
-    else:
-        f = float(img_min_side) / height
-        resized_width = int(f * width)
-        resized_height = int(img_min_side)
-
-    return resized_width, resized_height
-    
-class Generator(object):
+class FRCNNDataset(Dataset):
     def __init__(self,train_lines,shape=[600,600],batch_size=1):
-        self.batch_size = batch_size
         self.train_lines = train_lines
         self.train_batches = len(train_lines)
         self.shape = shape
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return self.train_batches
+
+    def rand(self, a=0, b=1):
+        return np.random.rand() * (b - a) + a
         
     def get_random_data(self, annotation_line, jitter=.3, hue=.1, sat=1.5, val=1.5):
         '''r实时数据增强的随机预处理'''
@@ -36,8 +33,8 @@ class Generator(object):
         box = np.array([np.array(list(map(int,box.split(',')))) for box in line[1:]])
 
         # resize image
-        new_ar = w/h * rand(1-jitter,1+jitter)/rand(1-jitter,1+jitter)
-        scale = rand(.5, 1.5)
+        new_ar = w/h * self.rand(1-jitter,1+jitter)/self.rand(1-jitter,1+jitter)
+        scale = self.rand(.5, 1.5)
         if new_ar < 1:
             nh = int(scale*h)
             nw = int(nh*new_ar)
@@ -47,20 +44,20 @@ class Generator(object):
         image = image.resize((nw,nh), Image.BICUBIC)
 
         # place image
-        dx = int(rand(0, w-nw))
-        dy = int(rand(0, h-nh))
+        dx = int(self.rand(0, w-nw))
+        dy = int(self.rand(0, h-nh))
         new_image = Image.new('RGB', (w,h), (128,128,128))
         new_image.paste(image, (dx, dy))
         image = new_image
 
         # flip image or not
-        flip = rand()<.5
+        flip = self.rand()<.5
         if flip: image = image.transpose(Image.FLIP_LEFT_RIGHT)
 
         # distort image
-        hue = rand(-hue, hue)
-        sat = rand(1, sat) if rand()<.5 else 1/rand(1, sat)
-        val = rand(1, val) if rand()<.5 else 1/rand(1, val)
+        hue = self.rand(-hue, hue)
+        sat = self.rand(1, sat) if self.rand()<.5 else 1/self.rand(1, sat)
+        val = self.rand(1, val) if self.rand()<.5 else 1/self.rand(1, val)
         x = cv2.cvtColor(np.array(image,np.float32)/255, cv2.COLOR_RGB2HSV)
         x[..., 0] += hue*360
         x[..., 0][x[..., 0]>1] -= 1
@@ -95,44 +92,45 @@ class Generator(object):
         else:
             return image_data, []
 
-    
-    def generate(self):
-        while True:
-            shuffle(self.train_lines)
-            lines = self.train_lines
-            b = 0
-            imgs = []
-            boxes = []
-            labels = []
-            for annotation_line in lines:  
-                img,y=self.get_random_data(annotation_line)
-                
-                if len(y)==0:
-                    continue
-                box = np.array(y[:,:4],dtype=np.float32)
-                box[:,0] = y[:,0]
-                box[:,1] = y[:,1]
-                box[:,2] = y[:,2]
-                box[:,3] = y[:,3]
-                
-                box_widths = box[:,2] - box[:,0]
-                box_heights = box[:,3] - box[:,1]
-                if (box_heights<=0).any() or (box_widths<=0).any():
-                    continue
-                label = y[:,-1]
-                img = img / 255.0
 
-                imgs.append(np.transpose(img,[2,0,1]))
-                boxes.append(box)
-                labels.append(label)
-                b += 1
-                if self.batch_size == b:
-                    imgs = np.array(imgs)
-                    boxes = np.array(boxes)
-                    labels = np.array(labels)
-                    b = 0
-                    yield imgs,boxes,labels
-                    imgs = []
-                    boxes = []
-                    labels = []
-                            
+    def __getitem__(self, index):
+        if index == 0:
+            shuffle(self.train_lines)
+        lines = self.train_lines
+        n = self.train_batches
+        while True:
+            img,y=self.get_random_data(lines[index])
+            if len(y)==0:
+                index = (index + 1) % n
+                continue
+            box = np.array(y[:,:4],dtype=np.float32)
+            box[:,0] = y[:,0]
+            box[:,1] = y[:,1]
+            box[:,2] = y[:,2]
+            box[:,3] = y[:,3]
+            
+            box_widths = box[:,2] - box[:,0]
+            box_heights = box[:,3] - box[:,1]
+            if (box_heights<=0).any() or (box_widths<=0).any():
+                index = (index + 1) % n
+                continue
+            break
+            
+        label = y[:,-1]
+        img = np.transpose(img / 255.0, [2,0,1])
+        return img, box, label
+
+# DataLoader中collate_fn使用
+def frcnn_dataset_collate(batch):
+    images = []
+    bboxes = []
+    labels = []
+    for img, box, label in batch:
+        images.append(img)
+        bboxes.append(box)
+        labels.append(label)
+    images = np.array(images)
+    bboxes = np.array(bboxes)
+    labels = np.array(labels)
+    return images, bboxes, labels
+
