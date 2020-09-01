@@ -140,7 +140,7 @@ class DecodeBox():
 class ProposalTargetCreator(object):
     def __init__(self,n_sample=128,
                  pos_ratio=0.25, pos_iou_thresh=0.5,
-                 neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0.1
+                 neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0
                  ):
         self.n_sample = n_sample
         self.pos_ratio = pos_ratio
