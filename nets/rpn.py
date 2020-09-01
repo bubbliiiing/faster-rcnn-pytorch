@@ -8,14 +8,22 @@ from torchvision.ops import nms
 import numpy as np
 
 
-
+'''
+一些建议的参数设置：
+VGG：SGD优化器，冻结时学习率1e-3，解冻时学习率1e-4
+    nets.rpn中ProposalCreator的n_train_post_nms=2000；
+    utils.utils中ProposalTargetCreator的pos_ratio=0.25；
+RESNET50：Adam优化器，冻结时学习率1e-4，解冻时学习率1e-5
+    nets.rpn中ProposalCreator的n_train_post_nms=300；
+    utils.utils中ProposalTargetCreator的pos_ratio=0.5;
+'''
 class ProposalCreator():
     def __init__(self,
                  mode,
                  nms_thresh=0.7,
                  n_train_pre_nms=12000,
-                 n_train_post_nms=2000,
-                 n_test_pre_nms=6000,
+                 n_train_post_nms=300,
+                 n_test_pre_nms=3000,
                  n_test_post_nms=300,
                  min_size=16
                  ):
