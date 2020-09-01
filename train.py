@@ -110,11 +110,11 @@ if __name__ == "__main__":
     num_train = len(lines) - num_val
     
     if True:
-        lr = 1e-4
+        lr = 1e-3
         Init_Epoch = 0
         Freeze_Epoch = 25
         
-        optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
+        optimizer = optim.SGD(model.parameters(),lr,weight_decay=5e-4,momentum=0.9)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
 
         if Use_Data_Loader:
@@ -146,10 +146,10 @@ if __name__ == "__main__":
             lr_scheduler.step()
 
     if True:
-        lr = 1e-5
+        lr = 1e-4
         Freeze_Epoch = 25
         Unfreeze_Epoch = 50
-        optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
+        optimizer = optim.SGD(model.parameters(),lr,weight_decay=5e-4,momentum=0.9)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
