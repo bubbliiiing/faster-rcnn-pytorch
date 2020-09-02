@@ -32,7 +32,7 @@ class Generator(object):
         line = annotation_line.split()
         image = Image.open(line[0])
         iw, ih = image.size
-        w,h = self.shape
+        h,w = self.shape
         box = np.array([np.array(list(map(int,box.split(',')))) for box in line[1:]])
 
         # resize image
