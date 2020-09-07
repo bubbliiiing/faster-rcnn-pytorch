@@ -134,7 +134,7 @@ if __name__ == "__main__":
         
         optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
         # optimizer = optim.SGD(model.parameters(),lr,weight_decay=5e-4,momentum=0.9)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.9)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
             train_dataset = FRCNNDataset(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
