@@ -87,7 +87,6 @@ def normal_init(m, mean, stddev, truncated=False):
 
 Stream = namedtuple('Stream', ['ptr'])
 
-@cupy.util.memoize(for_each_device=True)
 def load_kernel(kernel_name, code, **kwargs):
     cp.cuda.runtime.free(0)
     code = Template(code).substitute(**kwargs)
