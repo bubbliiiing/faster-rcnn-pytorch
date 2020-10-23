@@ -8,6 +8,12 @@
 4. [训练步骤 How2train](#训练步骤)
 5. [参考资料 Reference](#Reference)
 
+### 性能情况
+| 训练数据集 | 权值文件名称 | 测试数据集 | 输入图片大小 | mAP 0.5:0.95 | mAP 0.5 |
+| :-----: | :-----: | :------: | :------: | :------: | :-----: |
+| VOC07+12 | [voc_weights_resnet.pth](https://github.com/bubbliiiing/faster-rcnn-pytorch/releases/download/v1.0/voc_weights_resnet.pth) | VOC-Test07 | - | - | 74.55
+| VOC07+12 | [voc_weights_vgg.pth](https://github.com/bubbliiiing/faster-rcnn-pytorch/releases/download/v1.0/voc_weights_vgg.pth) | VOC-Test07 | - | - | 69.92
+
 ### 所需环境
 torch == 1.2.0
 
