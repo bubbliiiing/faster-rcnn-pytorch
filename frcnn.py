@@ -22,7 +22,7 @@ class FRCNN(object):
         "model_path"    : 'model_data/voc_weights_resnet.pth',
         "classes_path"  : 'model_data/voc_classes.txt',
         "confidence"    : 0.5,
-        "iou"           : 0.45,
+        "iou"           : 0.3,
         "backbone"      : "resnet50"
     }
 
