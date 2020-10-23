@@ -19,10 +19,11 @@ import math
 #--------------------------------------------#
 class FRCNN(object):
     _defaults = {
-        "model_path": 'model_data/voc_weights_resnet.pth',
-        "classes_path": 'model_data/voc_classes.txt',
-        "confidence": 0.5,
-        "backbone": "resnet50"
+        "model_path"    : 'model_data/voc_weights_resnet.pth',
+        "classes_path"  : 'model_data/voc_classes.txt',
+        "confidence"    : 0.5,
+        "iou"           : 0.45,
+        "backbone"      : "resnet50"
     }
 
     @classmethod
@@ -86,9 +87,11 @@ class FRCNN(object):
         old_height = image_shape[0]
         old_image = copy.deepcopy(image)
         width,height = get_new_img_size(old_width,old_height)
-        image = image.resize([width,height])
+
+        image = image.resize([width,height], Image.BICUBIC)
         photo = np.array(image,dtype = np.float32)/255
         photo = np.transpose(photo, (2, 0, 1))
+        
         with torch.no_grad():
             images = []
             images.append(photo)
@@ -97,7 +100,7 @@ class FRCNN(object):
 
             roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
             decodebox = DecodeBox(self.std, self.mean, self.num_classes)
-            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height=height, width=width, score_thresh = self.confidence)
+            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
             if len(outputs)==0:
                 return old_image
             bbox = outputs[:,:4]
@@ -107,6 +110,7 @@ class FRCNN(object):
             bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
             bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
             bbox = np.array(bbox,np.int32)
+
         image = old_image
         thickness = (np.shape(old_image)[0] + np.shape(old_image)[1]) // old_width*2
         font = ImageFont.truetype(font='model_data/simhei.ttf',size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))

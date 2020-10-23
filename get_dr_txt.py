@@ -3,32 +3,37 @@
 #   具体视频教程可查看
 #   https://www.bilibili.com/video/BV1zE411u7Vw
 #----------------------------------------------------#
-from frcnn import FRCNN
-from PIL import Image
-from torch.autograd import Variable
-import torch
-import numpy as np
+import copy
 import os
+
+import numpy as np
+import torch
 import torch.backends.cudnn as cudnn
+from PIL import Image, ImageDraw, ImageFont
+from torch.autograd import Variable
 from torch.nn import functional as F
-from utils.utils import loc2bbox, nms, DecodeBox
+from tqdm import tqdm
+
+from frcnn import FRCNN
 from nets.frcnn import FasterRCNN
 from nets.frcnn_training import get_new_img_size
-from PIL import Image, ImageFont, ImageDraw
-import copy
+from utils.utils import DecodeBox, loc2bbox, nms
+
 
 class mAP_FRCNN(FRCNN):
     #---------------------------------------------------#
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self,image_id,image):
-        self.confidence = 0.05
+        self.confidence = 0.01
+        self.iou        = 0.45
         f = open("./input/detection-results/"+image_id+".txt","w") 
         image_shape = np.array(np.shape(image)[0:2])
         old_width = image_shape[1]
         old_height = image_shape[0]
         width,height = get_new_img_size(old_width,old_height)
-        image = image.resize([width,height])
+        
+        image = image.resize([width,height], Image.BICUBIC)
         photo = np.array(image,dtype = np.float32)/255
         photo = np.transpose(photo, (2, 0, 1))
         with torch.no_grad():
@@ -39,7 +44,7 @@ class mAP_FRCNN(FRCNN):
 
             roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
             decodebox = DecodeBox(self.std, self.mean, self.num_classes)
-            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height=height, width=width, score_thresh = self.confidence)
+            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
             if len(outputs)==0:
                 return 
             bbox = outputs[:,:4]
@@ -71,12 +76,11 @@ if not os.path.exists("./input/images-optional"):
     os.makedirs("./input/images-optional")
 
 
-for image_id in image_ids:
+for image_id in tqdm(image_ids):
     image_path = "./VOCdevkit/VOC2007/JPEGImages/"+image_id+".jpg"
     image = Image.open(image_path)
-    image.save("./input/images-optional/"+image_id+".jpg")
+    # image.save("./input/images-optional/"+image_id+".jpg")
     frcnn.detect_image(image_id,image)
-    print(image_id," done!")
     
 
 print("Conversion completed!")

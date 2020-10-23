@@ -87,7 +87,7 @@ class DecodeBox():
         self.mean = mean
         self.num_classes = num_classes + 1    
 
-    def forward(self, roi_cls_locs, roi_scores, rois, height, width, score_thresh):
+    def forward(self, roi_cls_locs, roi_scores, rois, height, width, nms_iou, score_thresh):
 
         rois = torch.Tensor(rois)
 
@@ -130,24 +130,16 @@ class DecodeBox():
             
             prob_l_index = np.argsort(prob_l)[::-1]
             detections_class = detections_class[prob_l_index]
-            nms_out = nms(detections_class, 0.3)
+            nms_out = nms(detections_class, nms_iou)
             if outputs==[]:
                 outputs = nms_out
             else:
                 outputs = np.concatenate([outputs, nms_out],axis=0)
         return outputs
-'''
-一些建议的参数设置：
-VGG：SGD优化器，冻结时学习率1e-3，解冻时学习率1e-4
-    nets.rpn中ProposalCreator的n_train_post_nms=2000；
-    utils.utils中ProposalTargetCreator的pos_ratio=0.25；
-RESNET50：Adam优化器，冻结时学习率1e-4，解冻时学习率1e-5
-    nets.rpn中ProposalCreator的n_train_post_nms=300；
-    utils.utils中ProposalTargetCreator的pos_ratio=0.5;
-'''
+        
 class ProposalTargetCreator(object):
     def __init__(self,n_sample=128,
-                 pos_ratio=0.5, pos_iou_thresh=0.5,
+                 pos_ratio=0.25, pos_iou_thresh=0.5,
                  neg_iou_thresh_hi=0.5, neg_iou_thresh_lo=0
                  ):
         self.n_sample = n_sample

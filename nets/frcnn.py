@@ -64,3 +64,8 @@ class FasterRCNN(nn.Module):
         # print(roi_indices)
         roi_cls_locs, roi_scores = self.head.forward(h, rois, roi_indices)
         return roi_cls_locs, roi_scores, rois, roi_indices
+
+    def freeze_bn(self):
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()

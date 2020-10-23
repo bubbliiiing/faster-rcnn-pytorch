@@ -75,15 +75,6 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
     print('Saving state, iter:', str(epoch+1))
     torch.save(model.state_dict(), 'logs/Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth'%((epoch+1),total_loss/(epoch_size+1),val_toal_loss/(epoch_size_val+1)))
     
-'''
-一些建议的参数设置：
-VGG：SGD优化器，冻结时学习率1e-3，解冻时学习率1e-4
-    nets.rpn中ProposalCreator的n_train_post_nms=2000；
-    utils.utils中ProposalTargetCreator的pos_ratio=0.25；
-RESNET50：Adam优化器，冻结时学习率1e-4，解冻时学习率1e-5
-    nets.rpn中ProposalCreator的n_train_post_nms=300；
-    utils.utils中ProposalTargetCreator的pos_ratio=0.5;
-'''
 if __name__ == "__main__":
     # 参数初始化
     annotation_path = '2007_train.txt'
@@ -118,22 +109,12 @@ if __name__ == "__main__":
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
     
-    '''
-    一些建议的参数设置：
-    VGG：SGD优化器，冻结时学习率1e-3，解冻时学习率1e-4
-        nets.rpn中ProposalCreator的n_train_post_nms=2000；
-        utils.utils中ProposalTargetCreator的pos_ratio=0.25；
-    RESNET50：Adam优化器，冻结时学习率1e-4，解冻时学习率1e-5
-        nets.rpn中ProposalCreator的n_train_post_nms=300；
-        utils.utils中ProposalTargetCreator的pos_ratio=0.5;
-    '''
     if True:
         lr = 1e-4
         Init_Epoch = 0
-        Freeze_Epoch = 25
+        Freeze_Epoch = 50
         
         optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
-        # optimizer = optim.SGD(model.parameters(),lr,weight_decay=5e-4,momentum=0.9)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
@@ -158,7 +139,7 @@ if __name__ == "__main__":
         # ------------------------------------#
         #   由于batch==1所以冻结bn层
         # ------------------------------------#
-        model = model.eval()
+        model.freeze_bn()
 
         for epoch in range(Init_Epoch,Freeze_Epoch):
             fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch)
@@ -166,10 +147,10 @@ if __name__ == "__main__":
 
     if True:
         lr = 1e-5
-        Freeze_Epoch = 25
-        Unfreeze_Epoch = 50
+        Freeze_Epoch = 50
+        Unfreeze_Epoch = 100
+
         optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
-        # optimizer = optim.SGD(model.parameters(),lr,weight_decay=5e-4,momentum=0.9)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
@@ -194,7 +175,7 @@ if __name__ == "__main__":
         # ------------------------------------#
         #   由于batch==1所以冻结bn层
         # ------------------------------------#
-        model = model.eval()
+        model.freeze_bn()
 
         for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
             fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch)
