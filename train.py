@@ -120,9 +120,9 @@ if __name__ == "__main__":
         if Use_Data_Loader:
             train_dataset = FRCNNDataset(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
             val_dataset   = FRCNNDataset(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            gen     = DataLoader(train_dataset, batch_size=1, num_workers=4, pin_memory=True,
+            gen     = DataLoader(train_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
-            gen_val = DataLoader(val_dataset, batch_size=1, num_workers=4, pin_memory=True,
+            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
         else:
             gen     = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
@@ -156,9 +156,9 @@ if __name__ == "__main__":
         if Use_Data_Loader:
             train_dataset = FRCNNDataset(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
             val_dataset   = FRCNNDataset(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            gen     = DataLoader(train_dataset, batch_size=1, num_workers=4, pin_memory=True,
+            gen     = DataLoader(train_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
-            gen_val = DataLoader(val_dataset, batch_size=1, num_workers=4, pin_memory=True,
+            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
         else:
             gen     = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
