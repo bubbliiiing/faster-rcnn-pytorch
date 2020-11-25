@@ -1,17 +1,21 @@
-import cv2
-import numpy as np
 import colorsys
-import os
-import torch
-import time
-import torch.backends.cudnn as cudnn
-from torch.nn import functional as F
-from utils.utils import loc2bbox, nms, DecodeBox
-from nets.frcnn import FasterRCNN
-from nets.frcnn_training import get_new_img_size
-from PIL import Image, ImageFont, ImageDraw
 import copy
 import math
+import os
+import time
+
+import cv2
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
+import torch.nn as nn
+from PIL import Image, ImageDraw, ImageFont
+from torch.nn import functional as F
+
+from nets.frcnn import FasterRCNN
+from nets.frcnn_training import get_new_img_size
+from utils.utils import DecodeBox, loc2bbox, nms
+
 
 #--------------------------------------------#
 #   使用自己训练好的模型预测需要修改2个参数
@@ -23,7 +27,8 @@ class FRCNN(object):
         "classes_path"  : 'model_data/voc_classes.txt',
         "confidence"    : 0.5,
         "iou"           : 0.3,
-        "backbone"      : "resnet50"
+        "backbone"      : "resnet50",
+        "cuda"          : True,
     }
 
     @classmethod
@@ -40,8 +45,11 @@ class FRCNN(object):
         self.__dict__.update(self._defaults)
         self.class_names = self._get_class()
         self.generate()
-        self.mean = torch.Tensor([0,0,0,0]).cuda().repeat(self.num_classes+1)[None]
-        self.std = torch.Tensor([0.1, 0.1, 0.2, 0.2]).cuda().repeat(self.num_classes+1)[None]
+        self.mean = torch.Tensor([0,0,0,0]).repeat(self.num_classes+1)[None]
+        self.std = torch.Tensor([0.1, 0.1, 0.2, 0.2]).repeat(self.num_classes+1)[None]
+        if self.cuda:
+            self.mean = self.mean.cuda()
+            self.std = self.std.cuda()
 
     #---------------------------------------------------#
     #   获得所有的分类
@@ -61,12 +69,19 @@ class FRCNN(object):
         self.num_classes = len(self.class_names)
 
         # 载入模型，如果原来的模型里已经包括了模型结构则直接载入。
-        # 否则先构建模型再载入
-        self.model = FasterRCNN(self.num_classes,"predict",backbone=self.backbone).cuda()
+        self.model = FasterRCNN(self.num_classes,"predict",backbone=self.backbone)
+        print('Loading weights into state dict...')
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        state_dict = torch.load(self.model_path, map_location=device)
+        self.model.load_state_dict(state_dict)
+        
         self.model = self.model.eval()
-        self.model.load_state_dict(torch.load(self.model_path))
-        cudnn.benchmark = True
                 
+        if self.cuda:
+            os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+            self.model = nn.DataParallel(self.model)
+            self.model = self.model.cuda()
+
         print('{} model, anchors, and classes loaded.'.format(self.model_path))
 
         # 画框设置不同的颜色
@@ -81,22 +96,24 @@ class FRCNN(object):
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self, image):
-        start_time = time.time()
-        image_shape = np.array(np.shape(image)[0:2])
-        old_width = image_shape[1]
-        old_height = image_shape[0]
-        old_image = copy.deepcopy(image)
-        width,height = get_new_img_size(old_width,old_height)
-
-        image = image.resize([width,height], Image.BICUBIC)
-        photo = np.array(image,dtype = np.float32)/255
-        photo = np.transpose(photo, (2, 0, 1))
-        
         with torch.no_grad():
+            start_time = time.time()
+            image_shape = np.array(np.shape(image)[0:2])
+            old_width = image_shape[1]
+            old_height = image_shape[0]
+            old_image = copy.deepcopy(image)
+            width,height = get_new_img_size(old_width,old_height)
+
+            image = image.resize([width,height], Image.BICUBIC)
+            photo = np.array(image,dtype = np.float32)/255
+            photo = np.transpose(photo, (2, 0, 1))
+
             images = []
             images.append(photo)
             images = np.asarray(images)
-            images = torch.from_numpy(images).cuda()
+            images = torch.from_numpy(images)
+            if self.cuda:
+                images = images.cuda()
 
             roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
             decodebox = DecodeBox(self.std, self.mean, self.num_classes)

@@ -16,8 +16,7 @@ def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
         
-def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
-    train_util = FasterRCNNTrainer(net,optimizer)
+def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
     total_loss = 0
     rpn_loc_loss = 0
     rpn_cls_loss = 0
@@ -31,9 +30,14 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
             imgs,boxes,labels = batch[0], batch[1], batch[2]
 
             with torch.no_grad():
-                imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
-                boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
-                labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
+                if cuda:
+                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
+                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
+                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
+                else:
+                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
+                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)) for box in boxes]
+                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)) for label in labels]
             losses = train_util.train_step(imgs, boxes, labels, 1)
             rpn_loc, rpn_cls, roi_loc, roi_cls, total = losses
             total_loss += total
@@ -57,9 +61,14 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch):
                 break
             imgs,boxes,labels = batch[0], batch[1], batch[2]
             with torch.no_grad():
-                imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
-                boxes = Variable(torch.from_numpy(boxes).type(torch.FloatTensor)).cuda()
-                labels = Variable(torch.from_numpy(labels).type(torch.FloatTensor)).cuda()
+                if cuda:
+                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
+                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
+                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
+                else:
+                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
+                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)) for box in boxes]
+                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)) for label in labels]
 
                 train_util.optimizer.zero_grad()
                 losses = train_util.forward(imgs, boxes, labels, 1)
@@ -81,11 +90,12 @@ if __name__ == "__main__":
     NUM_CLASSES = 20
     IMAGE_SHAPE = [600,600,3]
     BACKBONE = "resnet50"
-    model = FasterRCNN(NUM_CLASSES,backbone=BACKBONE).cuda()
+    model = FasterRCNN(NUM_CLASSES,backbone=BACKBONE)
     #-------------------------------#
     #   Dataloder的使用
     #-------------------------------#
     Use_Data_Loader = True
+    Cuda = True
 
     model_path = r'model_data/voc_weights_resnet.pth'
     print('Loading weights into state dict...')
@@ -97,7 +107,11 @@ if __name__ == "__main__":
     model.load_state_dict(model_dict)
     print('Finished!')
 
-    cudnn.benchmark = True
+    net = model.train()
+    if Cuda:
+        net = torch.nn.DataParallel(model)
+        cudnn.benchmark = True
+        net = net.cuda()
 
     # 0.1用于验证，0.9用于训练
     val_split = 0.1
@@ -108,13 +122,14 @@ if __name__ == "__main__":
     np.random.seed(None)
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
+
     
     if True:
         lr = 1e-4
         Init_Epoch = 0
         Freeze_Epoch = 50
         
-        optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
+        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
@@ -130,6 +145,7 @@ if __name__ == "__main__":
                         
         epoch_size = num_train
         epoch_size_val = num_val
+
         # ------------------------------------#
         #   冻结一定部分训练
         # ------------------------------------#
@@ -141,8 +157,10 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
+        train_util = FasterRCNNTrainer(model,optimizer)
+
         for epoch in range(Init_Epoch,Freeze_Epoch):
-            fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch)
+            fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda)
             lr_scheduler.step()
 
     if True:
@@ -150,7 +168,7 @@ if __name__ == "__main__":
         Freeze_Epoch = 50
         Unfreeze_Epoch = 100
 
-        optimizer = optim.Adam(model.parameters(),lr,weight_decay=5e-4)
+        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
         if Use_Data_Loader:
@@ -177,6 +195,8 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
+        train_util = FasterRCNNTrainer(model,optimizer)
+
         for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
-            fit_ont_epoch(model,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch)
+            fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch,Cuda)
             lr_scheduler.step()

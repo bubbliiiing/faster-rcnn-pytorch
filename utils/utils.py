@@ -1,7 +1,8 @@
-import torch
-import cupy as cp
 import numpy as np
+import torch
 from torch.nn import functional as F
+
+
 def bbox2loc(src_bbox, dst_bbox):
     width = src_bbox[:, 2] - src_bbox[:, 0]
     height = src_bbox[:, 3] - src_bbox[:, 1]

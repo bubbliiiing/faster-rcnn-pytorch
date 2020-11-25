@@ -72,6 +72,9 @@ def make_layers(cfg, batch_norm=False):
 def decom_vgg16():
     model = VGG(make_layers(cfg))
     
+    state_dict = load_state_dict_from_url('https://download.pytorch.org/models/vgg16-397923af.pth', progress=True)
+    model.load_state_dict(state_dict)
+    
     # 获取特征提取部分
     features = list(model.features)[:30]
     # 获取分类部分

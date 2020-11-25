@@ -28,19 +28,23 @@ class mAP_FRCNN(FRCNN):
         self.confidence = 0.01
         self.iou        = 0.45
         f = open("./input/detection-results/"+image_id+".txt","w") 
-        image_shape = np.array(np.shape(image)[0:2])
-        old_width = image_shape[1]
-        old_height = image_shape[0]
-        width,height = get_new_img_size(old_width,old_height)
-        
-        image = image.resize([width,height], Image.BICUBIC)
-        photo = np.array(image,dtype = np.float32)/255
-        photo = np.transpose(photo, (2, 0, 1))
+
         with torch.no_grad():
+            image_shape = np.array(np.shape(image)[0:2])
+            old_width = image_shape[1]
+            old_height = image_shape[0]
+            width,height = get_new_img_size(old_width,old_height)
+            
+            image = image.resize([width,height], Image.BICUBIC)
+            photo = np.array(image,dtype = np.float32)/255
+            photo = np.transpose(photo, (2, 0, 1))
+            
             images = []
             images.append(photo)
             images = np.asarray(images)
-            images = torch.from_numpy(images).cuda()
+            images = torch.from_numpy(images)
+            if self.cuda:
+                images = images.cuda()
 
             roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
             decodebox = DecodeBox(self.std, self.mean, self.num_classes)

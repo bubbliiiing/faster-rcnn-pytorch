@@ -71,7 +71,11 @@ class FasterRCNNTrainer(nn.Module):
                                     gt_rpn_loc,
                                     gt_rpn_label.data,
                                     self.rpn_sigma)
-        rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label.cuda(), ignore_index=-1)
+
+        if rpn_score.is_cuda:
+            gt_rpn_label = gt_rpn_label.cuda()
+
+        rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label, ignore_index=-1)
 
                                
         # ------------------------------------------ #
@@ -92,8 +96,12 @@ class FasterRCNNTrainer(nn.Module):
 
         n_sample = roi_cls_loc.shape[0]
         roi_cls_loc = roi_cls_loc.view(n_sample, -1, 4)
-        roi_loc = roi_cls_loc[torch.arange(0, n_sample).long().cuda(), \
-                              torch.Tensor(gt_roi_label).long()]
+        
+        if roi_cls_loc.is_cuda:
+            roi_loc = roi_cls_loc[torch.arange(0, n_sample).long(), torch.Tensor(gt_roi_label).long()].cuda()
+        else:
+            roi_loc = roi_cls_loc[torch.arange(0, n_sample).long(), torch.Tensor(gt_roi_label).long()]
+
         gt_roi_label = torch.Tensor(gt_roi_label).long()
         gt_roi_loc = torch.Tensor(gt_roi_loc)
 
@@ -103,7 +111,10 @@ class FasterRCNNTrainer(nn.Module):
                         gt_roi_label.data,
                         self.roi_sigma)
 
-        roi_cls_loss = nn.CrossEntropyLoss()(roi_score, gt_roi_label.cuda())
+        if roi_score.is_cuda:
+            gt_roi_label = gt_roi_label.cuda()
+
+        roi_cls_loss = nn.CrossEntropyLoss()(roi_score, gt_roi_label)
 
 
         losses = [rpn_loc_loss, rpn_cls_loss, roi_loc_loss, roi_cls_loss]
@@ -119,9 +130,6 @@ class FasterRCNNTrainer(nn.Module):
 
 def _smooth_l1_loss(x, t, in_weight, sigma):
     sigma2 = sigma ** 2
-    in_weight = in_weight.cuda()
-    x = x.cuda()
-    t = t.cuda()
     diff = in_weight * (x - t)
     abs_diff = diff.abs()
     flag = (abs_diff.data < (1. / sigma2)).float()
@@ -133,6 +141,10 @@ def _smooth_l1_loss(x, t, in_weight, sigma):
 def _fast_rcnn_loc_loss(pred_loc, gt_loc, gt_label, sigma):
     in_weight = torch.zeros(gt_loc.shape)
     in_weight[(gt_label > 0).view(-1, 1).expand_as(in_weight)] = 1
+
+    if pred_loc.is_cuda:
+        gt_loc = gt_loc.cuda()
+        in_weight = in_weight.cuda()
     # smooth_l1损失函数
     loc_loss = _smooth_l1_loss(pred_loc, gt_loc, in_weight.detach(), sigma)
     # 进行标准化
