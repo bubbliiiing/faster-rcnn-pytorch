@@ -16,8 +16,7 @@ from tqdm import tqdm
 
 from frcnn import FRCNN
 from nets.frcnn import FasterRCNN
-from nets.frcnn_training import get_new_img_size
-from utils.utils import DecodeBox, loc2bbox, nms
+from utils.utils import DecodeBox, loc2bbox, nms, get_new_img_size
 
 
 class mAP_FRCNN(FRCNN):
@@ -29,35 +28,44 @@ class mAP_FRCNN(FRCNN):
         self.iou        = 0.45
         f = open("./input/detection-results/"+image_id+".txt","w") 
 
+        image_shape = np.array(np.shape(image)[0:2])
+        old_width, old_height = image_shape[1], image_shape[0]
+        old_image = copy.deepcopy(image)
+        
+        #---------------------------------------------------------#
+        #   给原图像进行resize，resize到短边为600的大小上
+        #---------------------------------------------------------#
+        width,height = get_new_img_size(old_width, old_height)
+        image = image.resize([width,height], Image.BICUBIC)
+
+        #-----------------------------------------------------------#
+        #   图片预处理，归一化。
+        #-----------------------------------------------------------#
+        photo = np.transpose(np.array(image,dtype = np.float32)/255, (2, 0, 1))
+
         with torch.no_grad():
-            image_shape = np.array(np.shape(image)[0:2])
-            old_width = image_shape[1]
-            old_height = image_shape[0]
-            width,height = get_new_img_size(old_width,old_height)
-            
-            image = image.resize([width,height], Image.BICUBIC)
-            photo = np.array(image,dtype = np.float32)/255
-            photo = np.transpose(photo, (2, 0, 1))
-            
-            images = []
-            images.append(photo)
-            images = np.asarray(images)
-            images = torch.from_numpy(images)
+            images = torch.from_numpy(np.asarray([photo]))
             if self.cuda:
                 images = images.cuda()
 
-            roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
-            decodebox = DecodeBox(self.std, self.mean, self.num_classes)
-            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
-            if len(outputs)==0:
-                return 
-            bbox = outputs[:,:4]
-            conf = outputs[:, 4]
-            label = outputs[:, 5]
+            roi_cls_locs, roi_scores, rois, _ = self.model(images)
 
-            bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
-            bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
-            bbox = np.array(bbox,np.int32)
+            #-------------------------------------------------------------#
+            #   利用classifier的预测结果对建议框进行解码，获得预测框
+            #-------------------------------------------------------------#
+            outputs = self.decodebox.forward(roi_cls_locs[0], roi_scores[0], rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
+            #---------------------------------------------------------#
+            #   如果没有检测出物体，返回原图
+            #---------------------------------------------------------#
+            if len(outputs)==0:
+                return old_image
+            outputs = np.array(outputs)
+            bbox = outputs[:,:4]
+            label = outputs[:, 4]
+            conf = outputs[:, 5]
+
+            bbox[:, 0::2] = (bbox[:, 0::2]) / width * old_width
+            bbox[:, 1::2] = (bbox[:, 1::2]) / height * old_height
             
         for i, c in enumerate(label):
             predicted_class = self.class_names[int(c)]

@@ -1,14 +1,15 @@
-from nets.frcnn import FasterRCNN
-from nets.frcnn_training import Generator
-from torch.autograd import Variable
-from trainer import FasterRCNNTrainer
 import time
+
 import numpy as np
 import torch
-import torch.optim as optim
 import torch.backends.cudnn as cudnn
-from tqdm import tqdm
+import torch.optim as optim
+from torch.autograd import Variable
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from nets.frcnn import FasterRCNN
+from trainer import FasterRCNNTrainer
 from utils.dataloader import FRCNNDataset, frcnn_dataset_collate
 
 
@@ -27,30 +28,26 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
         for iteration, batch in enumerate(gen):
             if iteration >= epoch_size:
                 break
-            imgs,boxes,labels = batch[0], batch[1], batch[2]
-
+            imgs, boxes, labels = batch[0], batch[1], batch[2]
             with torch.no_grad():
                 if cuda:
                     imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
-                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
-                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
                 else:
                     imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
-                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)) for box in boxes]
-                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)) for label in labels]
+
             losses = train_util.train_step(imgs, boxes, labels, 1)
             rpn_loc, rpn_cls, roi_loc, roi_cls, total = losses
-            total_loss += total
-            rpn_loc_loss += rpn_loc
-            rpn_cls_loss += rpn_cls
-            roi_loc_loss += roi_loc
-            roi_cls_loss += roi_cls
+            total_loss += total.item()
+            rpn_loc_loss += rpn_loc.item()
+            rpn_cls_loss += rpn_cls.item()
+            roi_loc_loss += roi_loc.item()
+            roi_cls_loss += roi_cls.item()
             
-            pbar.set_postfix(**{'total'    : total_loss.item() / (iteration + 1), 
-                                'rpn_loc'  : rpn_loc_loss.item() / (iteration + 1),  
-                                'rpn_cls'  : rpn_cls_loss.item() / (iteration + 1), 
-                                'roi_loc'  : roi_loc_loss.item() / (iteration + 1), 
-                                'roi_cls'  : roi_cls_loss.item() / (iteration + 1), 
+            pbar.set_postfix(**{'total'    : total_loss / (iteration + 1), 
+                                'rpn_loc'  : rpn_loc_loss / (iteration + 1),  
+                                'rpn_cls'  : rpn_cls_loss / (iteration + 1), 
+                                'roi_loc'  : roi_loc_loss / (iteration + 1), 
+                                'roi_cls'  : roi_cls_loss / (iteration + 1), 
                                 'lr'       : get_lr(optimizer)})
             pbar.update(1)
 
@@ -63,41 +60,51 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
             with torch.no_grad():
                 if cuda:
                     imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
-                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)).cuda() for box in boxes]
-                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)).cuda() for label in labels]
                 else:
                     imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
-                    boxes = [Variable(torch.from_numpy(box).type(torch.FloatTensor)) for box in boxes]
-                    labels = [Variable(torch.from_numpy(label).type(torch.FloatTensor)) for label in labels]
 
                 train_util.optimizer.zero_grad()
                 losses = train_util.forward(imgs, boxes, labels, 1)
-                _,_,_,_, val_total = losses
-                val_toal_loss += val_total
-            pbar.set_postfix(**{'total_loss': val_toal_loss.item() / (iteration + 1)})
+                _, _, _, _, val_total = losses
+
+                val_toal_loss += val_total.item()
+
+            pbar.set_postfix(**{'total_loss': val_toal_loss / (iteration + 1)})
             pbar.update(1)
 
     print('Finish Validation')
     print('Epoch:'+ str(epoch+1) + '/' + str(Epoch))
     print('Total Loss: %.4f || Val Loss: %.4f ' % (total_loss/(epoch_size+1),val_toal_loss/(epoch_size_val+1)))
-
     print('Saving state, iter:', str(epoch+1))
     torch.save(model.state_dict(), 'logs/Epoch%d-Total_Loss%.4f-Val_Loss%.4f.pth'%((epoch+1),total_loss/(epoch_size+1),val_toal_loss/(epoch_size_val+1)))
     
 if __name__ == "__main__":
-    # 参数初始化
-    annotation_path = '2007_train.txt'
-    NUM_CLASSES = 20
-    IMAGE_SHAPE = [600,600,3]
-    BACKBONE = "resnet50"
-    model = FasterRCNN(NUM_CLASSES,backbone=BACKBONE)
     #-------------------------------#
-    #   Dataloder的使用
+    #   是否使用Cuda
+    #   没有GPU可以设置成False
     #-------------------------------#
-    Use_Data_Loader = True
     Cuda = True
+    #----------------------------------------------------#
+    #   训练之前一定要修改NUM_CLASSES
+    #   修改成所需要区分的类的个数。
+    #----------------------------------------------------#
+    NUM_CLASSES = 20
+    #-------------------------------------------------------------------------------------#
+    #   input_shape是输入图片的大小，默认为800,800,3，随着输入图片的增大，占用显存会增大
+    #   视频上为600,600,3，实际测试中发现800,800,3效果更好
+    #-------------------------------------------------------------------------------------#
+    input_shape = [800,800,3]
+    #----------------------------------------------------#
+    #   使用到的主干特征提取网络
+    #   vgg或者resnet50
+    #----------------------------------------------------#
+    backbone = "resnet50"
+    model = FasterRCNN(NUM_CLASSES,backbone=backbone)
 
-    model_path = r'model_data/voc_weights_resnet.pth'
+    # #------------------------------------------------------#
+    #   权值文件请看README，百度网盘下载
+    #------------------------------------------------------#
+    model_path = 'model_data/voc_weights_resnet.pth'
     print('Loading weights into state dict...')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_dict = model.state_dict()
@@ -113,7 +120,12 @@ if __name__ == "__main__":
         cudnn.benchmark = True
         net = net.cuda()
 
-    # 0.1用于验证，0.9用于训练
+    annotation_path = '2007_train.txt'
+    #----------------------------------------------------------------------#
+    #   验证集的划分在train.py代码里面进行
+    #   2007_test.txt和2007_val.txt里面没有内容是正常的。训练不会使用到。
+    #   当前划分方式下，验证集和训练集的比例为1:9
+    #----------------------------------------------------------------------#
     val_split = 0.1
     with open(annotation_path) as f:
         lines = f.readlines()
@@ -123,29 +135,24 @@ if __name__ == "__main__":
     num_val = int(len(lines)*val_split)
     num_train = len(lines) - num_val
 
-    
     if True:
         lr = 1e-4
+        Batch_size = 2
         Init_Epoch = 0
         Freeze_Epoch = 50
         
-        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
+        optimizer = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
         lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
-        if Use_Data_Loader:
-            train_dataset = FRCNNDataset(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            val_dataset   = FRCNNDataset(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            gen     = DataLoader(train_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
-            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
-        else:
-            gen     = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
-            gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
+        train_dataset = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
+        val_dataset   = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
+        gen     = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+                                drop_last=True, collate_fn=frcnn_dataset_collate)
+        gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+                                drop_last=True, collate_fn=frcnn_dataset_collate)
                         
-        epoch_size = num_train
-        epoch_size_val = num_val
-
+        epoch_size = num_train // Batch_size
+        epoch_size_val = num_val // Batch_size
         # ------------------------------------#
         #   冻结一定部分训练
         # ------------------------------------#
@@ -153,11 +160,11 @@ if __name__ == "__main__":
             param.requires_grad = False
 
         # ------------------------------------#
-        #   由于batch==1所以冻结bn层
+        #   冻结bn层
         # ------------------------------------#
         model.freeze_bn()
 
-        train_util = FasterRCNNTrainer(model,optimizer)
+        train_util = FasterRCNNTrainer(model, optimizer)
 
         for epoch in range(Init_Epoch,Freeze_Epoch):
             fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda)
@@ -165,25 +172,22 @@ if __name__ == "__main__":
 
     if True:
         lr = 1e-5
+        Batch_size = 2
         Freeze_Epoch = 50
         Unfreeze_Epoch = 100
 
-        optimizer = optim.Adam(net.parameters(),lr,weight_decay=5e-4)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+        optimizer = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
 
-        if Use_Data_Loader:
-            train_dataset = FRCNNDataset(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            val_dataset   = FRCNNDataset(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1]))
-            gen     = DataLoader(train_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
-            gen_val = DataLoader(val_dataset, shuffle=True, batch_size=1, num_workers=4, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
-        else:
-            gen     = Generator(lines[:num_train],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
-            gen_val = Generator(lines[num_train:],(IMAGE_SHAPE[0],IMAGE_SHAPE[1])).generate()
+        train_dataset = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
+        val_dataset   = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
+        gen     = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+                                drop_last=True, collate_fn=frcnn_dataset_collate)
+        gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+                                drop_last=True, collate_fn=frcnn_dataset_collate)
                         
-        epoch_size = num_train
-        epoch_size_val = num_val
+        epoch_size = num_train // Batch_size
+        epoch_size_val = num_val // Batch_size
         #------------------------------------#
         #   解冻后训练
         #------------------------------------#
@@ -191,7 +195,7 @@ if __name__ == "__main__":
             param.requires_grad = True
 
         # ------------------------------------#
-        #   由于batch==1所以冻结bn层
+        #   冻结bn层
         # ------------------------------------#
         model.freeze_bn()
 

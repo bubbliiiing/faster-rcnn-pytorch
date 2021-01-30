@@ -1,3 +1,8 @@
+#---------------------------------------------#
+#   运行前一定要修改classes
+#   如果生成的2007_train.txt里面没有目标信息
+#   那么就是因为classes没有设定正确
+#---------------------------------------------#
 import xml.etree.ElementTree as ET
 from os import getcwd
 
@@ -14,7 +19,6 @@ def convert_annotation(year, image_id, list_file):
         difficult = 0 
         if obj.find('difficult')!=None:
             difficult = obj.find('difficult').text
-            
         cls = obj.find('name').text
         if cls not in classes or int(difficult)==1:
             continue

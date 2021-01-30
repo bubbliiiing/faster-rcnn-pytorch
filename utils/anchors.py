@@ -1,10 +1,10 @@
 import numpy as np
 
+
 def generate_anchor_base(base_size=16, ratios=[0.5, 1, 2],
                          anchor_scales=[8, 16, 32]):
 
-    anchor_base = np.zeros((len(ratios) * len(anchor_scales), 4),
-                           dtype=np.float32)
+    anchor_base = np.zeros((len(ratios) * len(anchor_scales), 4), dtype=np.float32)
     for i in range(len(ratios)):
         for j in range(len(anchor_scales)):
             h = base_size * anchor_scales[j] * np.sqrt(ratios[i])
@@ -33,15 +33,16 @@ def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):
     # 所有的先验框
     anchor = anchor.reshape((K * A, 4)).astype(np.float32)
     return anchor
-
-
+    
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     nine_anchors = generate_anchor_base()
     print(nine_anchors)
+
     height, width, feat_stride = 38,38,16
     anchors_all = _enumerate_shifted_anchor(nine_anchors,feat_stride,height,width)
-        
+    print(np.shape(anchors_all))
+    
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plt.ylim(-300,900)

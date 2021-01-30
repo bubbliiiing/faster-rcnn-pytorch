@@ -13,13 +13,15 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.nn import functional as F
 
 from nets.frcnn import FasterRCNN
-from nets.frcnn_training import get_new_img_size
-from utils.utils import DecodeBox, loc2bbox, nms
+from utils.utils import DecodeBox, get_new_img_size, loc2bbox, nms
 
 
 #--------------------------------------------#
 #   使用自己训练好的模型预测需要修改2个参数
 #   model_path和classes_path都需要修改！
+#   如果出现shape不匹配
+#   一定要注意训练时的NUM_CLASSES、
+#   model_path和classes_path参数的修改
 #--------------------------------------------#
 class FRCNN(object):
     _defaults = {
@@ -45,11 +47,14 @@ class FRCNN(object):
         self.__dict__.update(self._defaults)
         self.class_names = self._get_class()
         self.generate()
-        self.mean = torch.Tensor([0,0,0,0]).repeat(self.num_classes+1)[None]
+
+        self.mean = torch.Tensor([0, 0, 0, 0]).repeat(self.num_classes+1)[None]
         self.std = torch.Tensor([0.1, 0.1, 0.2, 0.2]).repeat(self.num_classes+1)[None]
         if self.cuda:
             self.mean = self.mean.cuda()
             self.std = self.std.cuda()
+            
+        self.decodebox = DecodeBox(self.std, self.mean, self.num_classes)
 
     #---------------------------------------------------#
     #   获得所有的分类
@@ -62,24 +67,26 @@ class FRCNN(object):
         return class_names
 
     #---------------------------------------------------#
-    #   获得所有的分类
+    #   载入模型
     #---------------------------------------------------#
     def generate(self):
-        # 计算总的种类
+        #-------------------------------#
+        #   计算总的类的数量
+        #-------------------------------#
         self.num_classes = len(self.class_names)
 
-        # 载入模型，如果原来的模型里已经包括了模型结构则直接载入。
-        self.model = FasterRCNN(self.num_classes,"predict",backbone=self.backbone)
+        #-------------------------------#
+        #   载入模型与权值
+        #-------------------------------#
+        self.model = FasterRCNN(self.num_classes,"predict",backbone=self.backbone).eval()
         print('Loading weights into state dict...')
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         state_dict = torch.load(self.model_path, map_location=device)
         self.model.load_state_dict(state_dict)
         
-        self.model = self.model.eval()
-                
         if self.cuda:
-            os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-            self.model = nn.DataParallel(self.model)
+            os.environ["CUDA_VISIBLE_DEVICES"]="0" 
+            # self.model = nn.DataParallel(self.model)
             self.model = self.model.cuda()
 
         print('{} model, anchors, and classes loaded.'.format(self.model_path))
@@ -96,42 +103,49 @@ class FRCNN(object):
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self, image):
+        image_shape = np.array(np.shape(image)[0:2])
+        old_width, old_height = image_shape[1], image_shape[0]
+        old_image = copy.deepcopy(image)
+        
+        #---------------------------------------------------------#
+        #   给原图像进行resize，resize到短边为600的大小上
+        #---------------------------------------------------------#
+        width,height = get_new_img_size(old_width, old_height)
+        image = image.resize([width,height], Image.BICUBIC)
+
+        #-----------------------------------------------------------#
+        #   图片预处理，归一化。
+        #-----------------------------------------------------------#
+        photo = np.transpose(np.array(image,dtype = np.float32)/255, (2, 0, 1))
+
         with torch.no_grad():
-            start_time = time.time()
-            image_shape = np.array(np.shape(image)[0:2])
-            old_width = image_shape[1]
-            old_height = image_shape[0]
-            old_image = copy.deepcopy(image)
-            width,height = get_new_img_size(old_width,old_height)
-
-            image = image.resize([width,height], Image.BICUBIC)
-            photo = np.array(image,dtype = np.float32)/255
-            photo = np.transpose(photo, (2, 0, 1))
-
-            images = []
-            images.append(photo)
-            images = np.asarray(images)
-            images = torch.from_numpy(images)
+            images = torch.from_numpy(np.asarray([photo]))
             if self.cuda:
                 images = images.cuda()
 
-            roi_cls_locs, roi_scores, rois, roi_indices = self.model(images)
-            decodebox = DecodeBox(self.std, self.mean, self.num_classes)
-            outputs = decodebox.forward(roi_cls_locs, roi_scores, rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
+            roi_cls_locs, roi_scores, rois, _ = self.model(images)
+            #-------------------------------------------------------------#
+            #   利用classifier的预测结果对建议框进行解码，获得预测框
+            #-------------------------------------------------------------#
+            outputs = self.decodebox.forward(roi_cls_locs[0], roi_scores[0], rois, height = height, width = width, nms_iou = self.iou, score_thresh = self.confidence)
+            #---------------------------------------------------------#
+            #   如果没有检测出物体，返回原图
+            #---------------------------------------------------------#
             if len(outputs)==0:
                 return old_image
+            outputs = np.array(outputs)
             bbox = outputs[:,:4]
-            conf = outputs[:, 4]
-            label = outputs[:, 5]
+            label = outputs[:, 4]
+            conf = outputs[:, 5]
 
-            bbox[:, 0::2] = (bbox[:, 0::2])/width*old_width
-            bbox[:, 1::2] = (bbox[:, 1::2])/height*old_height
-            bbox = np.array(bbox,np.int32)
+            bbox[:, 0::2] = (bbox[:, 0::2]) / width * old_width
+            bbox[:, 1::2] = (bbox[:, 1::2]) / height * old_height
 
-        image = old_image
-        thickness = (np.shape(old_image)[0] + np.shape(old_image)[1]) // old_width*2
         font = ImageFont.truetype(font='model_data/simhei.ttf',size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
+
+        thickness = max((np.shape(old_image)[0] + np.shape(old_image)[1]) // old_width * 2, 1)
                 
+        image = old_image
         for i, c in enumerate(label):
             predicted_class = self.class_names[int(c)]
             score = conf[i]
@@ -152,7 +166,7 @@ class FRCNN(object):
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
             label = label.encode('utf-8')
-            print(label)
+            print(label, top, left, bottom, right)
             
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -169,5 +183,4 @@ class FRCNN(object):
             draw.text(text_origin, str(label,'UTF-8'), fill=(0, 0, 0), font=font)
             del draw
         
-        print("time:",time.time()-start_time)
         return image
