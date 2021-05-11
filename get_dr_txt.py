@@ -40,6 +40,10 @@ class mAP_FRCNN(FRCNN):
         self.confidence = 0.01
         self.iou        = 0.45
         f = open("./input/detection-results/"+image_id+".txt","w") 
+        #-------------------------------------#
+        #   转换成RGB图片，可以用于灰度图预测。
+        #-------------------------------------#
+        image = image.convert("RGB")
 
         image_shape = np.array(np.shape(image)[0:2])
         old_width, old_height = image_shape[1], image_shape[0]

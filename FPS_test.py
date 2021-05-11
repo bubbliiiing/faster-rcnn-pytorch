@@ -1,10 +1,5 @@
-import colorsys
-import copy
-import math
-import os
 import time
 
-import cv2
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -15,7 +10,6 @@ from torch.nn import functional as F
 from tqdm import tqdm
 
 from frcnn import FRCNN
-from nets.frcnn import FasterRCNN
 from utils.utils import DecodeBox, get_new_img_size, loc2bbox, nms
 
 '''
@@ -27,9 +21,13 @@ video.py里面测试的FPS会低于该FPS，因为摄像头的读取频率有限
 '''
 class FPS_FRCNN(FRCNN):
     def get_FPS(self, image, test_interval):
+        #-------------------------------------#
+        #   转换成RGB图片，可以用于灰度图预测。
+        #-------------------------------------#
+        image = image.convert("RGB")
+
         image_shape = np.array(np.shape(image)[0:2])
         old_width, old_height = image_shape[1], image_shape[0]
-        old_image = copy.deepcopy(image)
         
         #---------------------------------------------------------#
         #   给原图像进行resize，resize到短边为600的大小上

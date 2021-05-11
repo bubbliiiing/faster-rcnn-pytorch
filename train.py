@@ -1,5 +1,3 @@
-import time
-
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -11,6 +9,7 @@ from tqdm import tqdm
 from nets.frcnn import FasterRCNN
 from trainer import FasterRCNNTrainer
 from utils.dataloader import FRCNNDataset, frcnn_dataset_collate
+from utils.utils import LossHistory
 
 
 def get_lr(optimizer):
@@ -72,6 +71,7 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
             pbar.set_postfix(**{'total_loss': val_toal_loss / (iteration + 1)})
             pbar.update(1)
 
+    loss_history.append_loss(total_loss/(epoch_size+1), val_toal_loss/(epoch_size_val+1))
     print('Finish Validation')
     print('Epoch:'+ str(epoch+1) + '/' + str(Epoch))
     print('Total Loss: %.4f || Val Loss: %.4f ' % (total_loss/(epoch_size+1),val_toal_loss/(epoch_size_val+1)))
@@ -120,6 +120,8 @@ if __name__ == "__main__":
         cudnn.benchmark = True
         net = net.cuda()
 
+    loss_history = LossHistory("logs/")
+
     annotation_path = '2007_train.txt'
     #----------------------------------------------------------------------#
     #   验证集的划分在train.py代码里面进行
@@ -161,6 +163,10 @@ if __name__ == "__main__":
                         
         epoch_size = num_train // Batch_size
         epoch_size_val = num_val // Batch_size
+
+        if epoch_size == 0 or epoch_size_val == 0:
+            raise ValueError("数据集过小，无法进行训练，请扩充数据集。")
+
         # ------------------------------------#
         #   冻结一定部分训练
         # ------------------------------------#
@@ -196,6 +202,10 @@ if __name__ == "__main__":
                         
         epoch_size = num_train // Batch_size
         epoch_size_val = num_val // Batch_size
+        
+        if epoch_size == 0 or epoch_size_val == 0:
+            raise ValueError("数据集过小，无法进行训练，请扩充数据集。")
+            
         #------------------------------------#
         #   解冻后训练
         #------------------------------------#

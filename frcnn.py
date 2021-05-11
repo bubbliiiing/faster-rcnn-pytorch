@@ -103,6 +103,11 @@ class FRCNN(object):
     #   检测图片
     #---------------------------------------------------#
     def detect_image(self, image):
+        #-------------------------------------#
+        #   转换成RGB图片，可以用于灰度图预测。
+        #-------------------------------------#
+        image = image.convert("RGB")
+        
         image_shape = np.array(np.shape(image)[0:2])
         old_width, old_height = image_shape[1], image_shape[0]
         old_image = copy.deepcopy(image)
