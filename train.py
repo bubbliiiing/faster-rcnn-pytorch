@@ -9,7 +9,7 @@ from tqdm import tqdm
 from nets.frcnn import FasterRCNN
 from trainer import FasterRCNNTrainer
 from utils.dataloader import FRCNNDataset, frcnn_dataset_collate
-from utils.utils import LossHistory
+from utils.utils import LossHistory, weights_init
 
 
 def get_lr(optimizer):
@@ -100,6 +100,7 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     backbone = "resnet50"
     model = FasterRCNN(NUM_CLASSES,backbone=backbone)
+    weights_init(model)
 
     # #------------------------------------------------------#
     #   权值文件请看README，百度网盘下载
