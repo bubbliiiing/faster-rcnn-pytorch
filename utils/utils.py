@@ -266,7 +266,7 @@ class ProposalTargetCreator(object):
             gt_roi_label = label[gt_assignment] + 1
 
         #----------------------------------------------------------------#
-        #   满足建议框和真实框重合程度大于neg_iou_thresh_high的作为负样本
+        #   满足建议框和真实框重合程度大于pos_iou_thresh的作为正样本
         #   将正样本的数量限制在self.pos_roi_per_image以内
         #----------------------------------------------------------------#
         pos_index = np.where(max_iou >= self.pos_iou_thresh)[0]
