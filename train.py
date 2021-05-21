@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -30,9 +29,9 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
             imgs, boxes, labels = batch[0], batch[1], batch[2]
             with torch.no_grad():
                 if cuda:
-                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
+                    imgs = torch.from_numpy(imgs).type(torch.FloatTensor).cuda()
                 else:
-                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
+                    imgs = torch.from_numpy(imgs).type(torch.FloatTensor)
 
             losses = train_util.train_step(imgs, boxes, labels, 1)
             rpn_loc, rpn_cls, roi_loc, roi_cls, total = losses
@@ -58,9 +57,9 @@ def fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,genval,Epoch,cuda):
             imgs,boxes,labels = batch[0], batch[1], batch[2]
             with torch.no_grad():
                 if cuda:
-                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor)).cuda()
+                    imgs = torch.from_numpy(imgs).type(torch.FloatTensor).cuda()
                 else:
-                    imgs = Variable(torch.from_numpy(imgs).type(torch.FloatTensor))
+                    imgs = torch.from_numpy(imgs).type(torch.FloatTensor)
 
                 train_util.optimizer.zero_grad()
                 losses = train_util.forward(imgs, boxes, labels, 1)
@@ -147,23 +146,23 @@ if __name__ == "__main__":
     #   提示OOM或者显存不足请调小Batch_size
     #------------------------------------------------------#
     if True:
-        lr = 1e-4
-        Batch_size = 2
-        Init_Epoch = 0
-        Freeze_Epoch = 50
+        lr              = 1e-4
+        Batch_size      = 2
+        Init_Epoch      = 0
+        Freeze_Epoch    = 50
         
-        optimizer = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
+        optimizer       = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
+        lr_scheduler    = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
 
-        train_dataset = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
-        val_dataset   = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
-        gen     = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+        train_dataset   = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
+        val_dataset     = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
+        gen             = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                 drop_last=True, collate_fn=frcnn_dataset_collate)
-        gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+        gen_val         = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                 drop_last=True, collate_fn=frcnn_dataset_collate)
                         
-        epoch_size = num_train // Batch_size
-        epoch_size_val = num_val // Batch_size
+        epoch_size      = num_train // Batch_size
+        epoch_size_val  = num_val // Batch_size
 
         if epoch_size == 0 or epoch_size_val == 0:
             raise ValueError("数据集过小，无法进行训练，请扩充数据集。")
@@ -179,30 +178,30 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
-        train_util = FasterRCNNTrainer(model, optimizer)
+        train_util      = FasterRCNNTrainer(model, optimizer)
 
         for epoch in range(Init_Epoch,Freeze_Epoch):
             fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda)
             lr_scheduler.step()
 
     if True:
-        lr = 1e-5
-        Batch_size = 2
-        Freeze_Epoch = 50
-        Unfreeze_Epoch = 100
+        lr              = 1e-5
+        Batch_size      = 2
+        Freeze_Epoch    = 50
+        Unfreeze_Epoch  = 100
 
-        optimizer = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
+        optimizer       = optim.Adam(net.parameters(), lr, weight_decay=5e-4)
+        lr_scheduler    = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
 
-        train_dataset = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
-        val_dataset   = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
-        gen     = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+        train_dataset   = FRCNNDataset(lines[:num_train], (input_shape[0], input_shape[1]), is_train=True)
+        val_dataset     = FRCNNDataset(lines[num_train:], (input_shape[0], input_shape[1]), is_train=False)
+        gen             = DataLoader(train_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                 drop_last=True, collate_fn=frcnn_dataset_collate)
-        gen_val = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
+        gen_val         = DataLoader(val_dataset, shuffle=True, batch_size=Batch_size, num_workers=4, pin_memory=True,
                                 drop_last=True, collate_fn=frcnn_dataset_collate)
                         
-        epoch_size = num_train // Batch_size
-        epoch_size_val = num_val // Batch_size
+        epoch_size      = num_train // Batch_size
+        epoch_size_val  = num_val // Batch_size
         
         if epoch_size == 0 or epoch_size_val == 0:
             raise ValueError("数据集过小，无法进行训练，请扩充数据集。")
@@ -218,7 +217,7 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
-        train_util = FasterRCNNTrainer(model,optimizer)
+        train_util      = FasterRCNNTrainer(model,optimizer)
 
         for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
             fit_ont_epoch(net,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch,Cuda)

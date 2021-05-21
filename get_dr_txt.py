@@ -8,15 +8,11 @@ import os
 
 import numpy as np
 import torch
-import torch.backends.cudnn as cudnn
-from PIL import Image, ImageDraw, ImageFont
-from torch.autograd import Variable
-from torch.nn import functional as F
+from PIL import Image
 from tqdm import tqdm
 
 from frcnn import FRCNN
-from nets.frcnn import FasterRCNN
-from utils.utils import DecodeBox, loc2bbox, nms, get_new_img_size
+from utils.utils import get_new_img_size
 
 '''
 这里设置的门限值较低是因为计算map需要用到不同门限条件下的Recall和Precision值。
@@ -104,7 +100,6 @@ if not os.path.exists("./input/detection-results"):
 if not os.path.exists("./input/images-optional"):
     os.makedirs("./input/images-optional")
 
-
 for image_id in tqdm(image_ids):
     image_path = "./VOCdevkit/VOC2007/JPEGImages/"+image_id+".jpg"
     image = Image.open(image_path)
@@ -112,5 +107,4 @@ for image_id in tqdm(image_ids):
     # image.save("./input/images-optional/"+image_id+".jpg")
     frcnn.detect_image(image_id,image)
     
-
 print("Conversion completed!")

@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision
-from torchvision.models.utils import load_state_dict_from_url
 
 cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']
 

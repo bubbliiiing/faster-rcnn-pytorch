@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-
-import os
-import time
 from collections import namedtuple
 
 import torch as torch

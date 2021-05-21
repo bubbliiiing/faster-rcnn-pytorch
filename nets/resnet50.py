@@ -1,11 +1,7 @@
 import math
-import pdb
 
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.utils.model_zoo as model_zoo
-from torch.autograd import Variable
+
 
 class Bottleneck(nn.Module):
     expansion = 4
