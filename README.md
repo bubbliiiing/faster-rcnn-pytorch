@@ -1,6 +1,9 @@
 ## Faster-Rcnn：Two-Stage目标检测模型在Pytorch当中的实现
 ---
 
+**2021年10月14日更新：**   
+**进行了大幅度的更新，对代码的模块进行修改，加了大量注释。**   
+
 ## 目录
 1. [性能情况 Performance](#性能情况)
 2. [所需环境 Environment](#所需环境)
@@ -22,8 +25,9 @@ torch == 1.2.0
 ## 文件下载
 训练所需的voc_weights_resnet.pth或者voc_weights_vgg.pth可以在百度云下载。  
 voc_weights_resnet.pth是resnet为主干特征提取网络用到的；  
-voc_weights_vgg.pth是vgg为主干特征提取网络用到的；  
-链接: https://pan.baidu.com/s/1-PtvHJGTvXJ5YYWs1hs9hQ 提取码: kdps   
+voc_weights_vgg.pth是vgg为主干特征提取网络用到的；   
+链接: https://pan.baidu.com/s/1S6wG8sEXBeoSec95NZxmlQ      
+提取码: 8mgp    
 
 VOC数据集下载地址如下，里面已经包括了训练集、测试集、验证集（与测试集一样），无需再次划分：  
 链接: https://pan.baidu.com/s/1YuBbBKxm2FGgTU5OfaeC5A    
