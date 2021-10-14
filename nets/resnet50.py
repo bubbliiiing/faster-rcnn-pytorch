@@ -1,6 +1,7 @@
 import math
 
 import torch.nn as nn
+from torchvision.models.utils import load_state_dict_from_url
 
 
 class Bottleneck(nn.Module):
@@ -110,17 +111,20 @@ class ResNet(nn.Module):
         x = self.fc(x)
         return x
 
-def resnet50():
+def resnet50(pretrained = False):
     model = ResNet(Bottleneck, [3, 4, 6, 3])
+    if pretrained:
+        state_dict = load_state_dict_from_url("https://download.pytorch.org/models/resnet50-19c8e357.pth", model_dir="./model_data")
+        model.load_state_dict(state_dict)
     #----------------------------------------------------------------------------#
     #   获取特征提取部分，从conv1到model.layer3，最终获得一个38,38,1024的特征层
     #----------------------------------------------------------------------------#
-    features = list([model.conv1, model.bn1, model.relu, model.maxpool, model.layer1, model.layer2, model.layer3])
+    features    = list([model.conv1, model.bn1, model.relu, model.maxpool, model.layer1, model.layer2, model.layer3])
     #----------------------------------------------------------------------------#
     #   获取分类部分，从model.layer4到model.avgpool
     #----------------------------------------------------------------------------#
-    classifier = list([model.layer4, model.avgpool])
+    classifier  = list([model.layer4, model.avgpool])
     
-    features = nn.Sequential(*features)
-    classifier = nn.Sequential(*classifier)
+    features    = nn.Sequential(*features)
+    classifier  = nn.Sequential(*classifier)
     return features, classifier

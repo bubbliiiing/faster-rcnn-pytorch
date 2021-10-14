@@ -13,11 +13,11 @@ class VGG16RoIHead(nn.Module):
         #--------------------------------------#
         #   对ROIPooling后的的结果进行回归预测
         #--------------------------------------#
-        self.cls_loc = nn.Linear(4096, n_class * 4)
+        self.cls_loc    = nn.Linear(4096, n_class * 4)
         #-----------------------------------#
         #   对ROIPooling后的的结果进行分类
         #-----------------------------------#
-        self.score = nn.Linear(4096, n_class)
+        self.score      = nn.Linear(4096, n_class)
         #-----------------------------------#
         #   权值初始化
         #-----------------------------------#
@@ -45,14 +45,16 @@ class VGG16RoIHead(nn.Module):
         #   利用classifier网络进行特征提取
         #-----------------------------------#
         pool = pool.view(pool.size(0), -1)
-        # 当输入为一张图片的时候，这里获得的f7的shape为[300, 4096]
+        #--------------------------------------------------------------#
+        #   当输入为一张图片的时候，这里获得的f7的shape为[300, 4096]
+        #--------------------------------------------------------------#
         fc7 = self.classifier(pool)
 
-        roi_cls_locs = self.cls_loc(fc7)
-        roi_scores = self.score(fc7)
+        roi_cls_locs    = self.cls_loc(fc7)
+        roi_scores      = self.score(fc7)
 
-        roi_cls_locs = roi_cls_locs.view(n, -1, roi_cls_locs.size(1))
-        roi_scores = roi_scores.view(n, -1, roi_scores.size(1))
+        roi_cls_locs    = roi_cls_locs.view(n, -1, roi_cls_locs.size(1))
+        roi_scores      = roi_scores.view(n, -1, roi_scores.size(1))
         return roi_cls_locs, roi_scores
 
 class Resnet50RoIHead(nn.Module):
@@ -80,7 +82,7 @@ class Resnet50RoIHead(nn.Module):
         if x.is_cuda:
             roi_indices = roi_indices.cuda()
             rois = rois.cuda()
-
+        
         rois_feature_map = torch.zeros_like(rois)
         rois_feature_map[:, [0,2]] = rois[:, [0,2]] / img_size[1] * x.size()[3]
         rois_feature_map[:, [1,3]] = rois[:, [1,3]] / img_size[0] * x.size()[2]
@@ -94,13 +96,15 @@ class Resnet50RoIHead(nn.Module):
         #   利用classifier网络进行特征提取
         #-----------------------------------#
         fc7 = self.classifier(pool)
-        # 当输入为一张图片的时候，这里获得的f7的shape为[300, 2048]
+        #--------------------------------------------------------------#
+        #   当输入为一张图片的时候，这里获得的f7的shape为[300, 2048]
+        #--------------------------------------------------------------#
         fc7 = fc7.view(fc7.size(0), -1)
 
-        roi_cls_locs = self.cls_loc(fc7)
-        roi_scores = self.score(fc7)
-        roi_cls_locs = roi_cls_locs.view(n, -1, roi_cls_locs.size(1))
-        roi_scores = roi_scores.view(n, -1, roi_scores.size(1))
+        roi_cls_locs    = self.cls_loc(fc7)
+        roi_scores      = self.score(fc7)
+        roi_cls_locs    = roi_cls_locs.view(n, -1, roi_cls_locs.size(1))
+        roi_scores      = roi_scores.view(n, -1, roi_scores.size(1))
         return roi_cls_locs, roi_scores
 
 def normal_init(m, mean, stddev, truncated=False):
