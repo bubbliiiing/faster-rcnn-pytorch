@@ -199,7 +199,7 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
-        train_util      = FasterRCNNTrainer(model_train, optimizer)
+        train_util      = FasterRCNNTrainer(model, optimizer)
 
         for epoch in range(start_epoch, end_epoch):
             fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, end_epoch, Cuda)
@@ -239,7 +239,7 @@ if __name__ == "__main__":
         # ------------------------------------#
         model.freeze_bn()
 
-        train_util      = FasterRCNNTrainer(model_train, optimizer)
+        train_util      = FasterRCNNTrainer(model, optimizer)
 
         for epoch in range(start_epoch, end_epoch):
             fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, end_epoch, Cuda)
