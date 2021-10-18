@@ -239,12 +239,12 @@ class FasterRCNNTrainer(nn.Module):
         #-------------------------------#
         #   获取公用特征层
         #-------------------------------#
-        base_feature = self.faster_rcnn.module.extractor(imgs)
+        base_feature = self.faster_rcnn.extractor(imgs)
 
         # -------------------------------------------------- #
         #   利用rpn网络获得调整参数、得分、建议框、先验框
         # -------------------------------------------------- #
-        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.faster_rcnn.module.rpn(base_feature, img_size, scale)
+        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.faster_rcnn.rpn(base_feature, img_size, scale)
 
         rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all = 0, 0, 0, 0
         for i in range(n):
@@ -294,7 +294,7 @@ class FasterRCNNTrainer(nn.Module):
                 gt_roi_loc          = gt_roi_loc.cuda()
                 gt_roi_label        = gt_roi_label.cuda()
 
-            roi_cls_loc, roi_score = self.faster_rcnn.module.head(torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size)
+            roi_cls_loc, roi_score = self.faster_rcnn.head(torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size)
 
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果
