@@ -114,7 +114,7 @@ class DecodeBox():
                     #-----------------------------------------#
                     good_boxes  = boxes_to_process[keep]
                     confs       = confs_to_process[keep][:, None]
-                    labels      = (c - 1) * torch.ones((len(keep), 1)).cuda() if confs.is_cuda else torch.ones((len(keep), 1))
+                    labels      = (c - 1) * torch.ones((len(keep), 1)).cuda() if confs.is_cuda else (c - 1) * torch.ones((len(keep), 1))
                     #-----------------------------------------#
                     #   将label、置信度、框的位置进行堆叠。
                     #-----------------------------------------#
