@@ -131,7 +131,7 @@ if __name__ == "__main__":
     class_names, num_classes = get_classes(classes_path)
     
     model = FasterRCNN(num_classes, anchor_scales = anchors_size, backbone = backbone, pretrained = pretrained)
-    if pretrained:
+    if not pretrained:
         weights_init(model)
     if model_path != '':
         #------------------------------------------------------#
