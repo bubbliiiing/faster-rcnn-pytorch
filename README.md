@@ -13,6 +13,7 @@
 
 ## Top News
 **`2022-04`**:**进行了大幅度的更新，支持step、cos学习率下降法、支持adam、sgd优化器选择、支持学习率根据batch_size自适应调整、新增图片裁剪。**   
+BiliBili视频中的原仓库地址为：https://github.com/bubbliiiing/faster-rcnn-pytorch/tree/bilibili
 
 **`2021-10`**:**进行了大幅度的更新，增加了大量注释、增加了大量可调整参数、对代码的组成模块进行修改、增加fps、视频预测、批量预测等功能。**   
 
