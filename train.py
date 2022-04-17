@@ -329,8 +329,12 @@ if __name__ == "__main__":
                 #---------------------------------------#
                 lr_scheduler_func = get_lr_scheduler(lr_decay_type, Init_lr_fit, Min_lr_fit, UnFreeze_Epoch)
                 
-                for param in model.backbone_net.parameters():
+                for param in model.extractor.parameters():
                     param.requires_grad = True
+                # ------------------------------------#
+                #   冻结bn层
+                # ------------------------------------#
+                model.freeze_bn()
 
                 epoch_step      = num_train // batch_size
                 epoch_step_val  = num_val // batch_size
