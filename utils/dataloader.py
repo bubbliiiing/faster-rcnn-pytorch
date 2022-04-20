@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import torch
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 
@@ -159,6 +160,6 @@ def frcnn_dataset_collate(batch):
         images.append(img)
         bboxes.append(box)
         labels.append(label)
-    images = np.array(images)
+    images = torch.from_numpy(np.array(images))
     return images, bboxes, labels
 

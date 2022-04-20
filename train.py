@@ -1,11 +1,13 @@
 #-------------------------------------#
 #       对数据集进行训练
 #-------------------------------------#
+import os
 import warnings
 
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+import torch.distributed as dist
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
@@ -44,7 +46,28 @@ if __name__ == "__main__":
     #   是否使用Cuda
     #   没有GPU可以设置成False
     #-------------------------------#
-    Cuda = True
+    Cuda            = True
+    #---------------------------------------------------------------------#
+    #   distributed     用于指定是否使用单机多卡分布式运行
+    #                   终端指令仅支持Ubuntu。CUDA_VISIBLE_DEVICES用于在Ubuntu下指定显卡。
+    #                   Windows系统下默认使用DP模式调用所有显卡，不支持DDP。
+    #   DP模式：
+    #       设置            distributed = False
+    #       在终端中输入    CUDA_VISIBLE_DEVICES=0,1 python train.py
+    #   DDP模式：
+    #       设置            distributed = True
+    #       在终端中输入    CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 train.py
+    #---------------------------------------------------------------------#
+    distributed     = False
+    #---------------------------------------------------------------------#
+    #   sync_bn     是否使用sync_bn，DDP模式多卡可用
+    #---------------------------------------------------------------------#
+    sync_bn         = False
+    #---------------------------------------------------------------------#
+    #   fp16        是否使用混合精度训练
+    #               可减少约一半的显存、需要pytorch1.7.1以上
+    #---------------------------------------------------------------------#
+    fp16            = False
     #---------------------------------------------------------------------#
     #   classes_path    指向model_data下的txt，与自己训练的数据集相关 
     #                   训练前一定要修改classes_path，使其对应自己的数据集
@@ -106,16 +129,16 @@ if __name__ == "__main__":
     #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 100，Freeze_Train = True，optimizer_type = 'adam'，Init_lr = 1e-4。（冻结）
     #           Init_Epoch = 0，UnFreeze_Epoch = 100，Freeze_Train = False，optimizer_type = 'adam'，Init_lr = 1e-4。（不冻结）
     #       SGD：
-    #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 100，Freeze_Train = True，optimizer_type = 'sgd'，Init_lr = 1e-3。（冻结）
-    #           Init_Epoch = 0，UnFreeze_Epoch = 100，Freeze_Train = False，optimizer_type = 'sgd'，Init_lr = 1e-3。（不冻结）
+    #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 100，Freeze_Train = True，optimizer_type = 'sgd'，Init_lr = 1e-2。（冻结）
+    #           Init_Epoch = 0，UnFreeze_Epoch = 100，Freeze_Train = False，optimizer_type = 'sgd'，Init_lr = 1e-2。（不冻结）
     #       其中：UnFreeze_Epoch可以在100-300之间调整。
     #   （二）从主干网络的预训练权重开始训练：
     #       Adam：
     #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 100，Freeze_Train = True，optimizer_type = 'adam'，Init_lr = 1e-4。（冻结）
     #           Init_Epoch = 0，UnFreeze_Epoch = 100，Freeze_Train = False，optimizer_type = 'adam'，Init_lr = 1e-4。（不冻结）
     #       SGD：
-    #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 150，Freeze_Train = True，optimizer_type = 'sgd'，Init_lr = 1e-3。（冻结）
-    #           Init_Epoch = 0，UnFreeze_Epoch = 150，Freeze_Train = False，optimizer_type = 'sgd'，Init_lr = 1e-3。（不冻结）
+    #           Init_Epoch = 0，Freeze_Epoch = 50，UnFreeze_Epoch = 150，Freeze_Train = True，optimizer_type = 'sgd'，Init_lr = 1e-2。（冻结）
+    #           Init_Epoch = 0，UnFreeze_Epoch = 150，Freeze_Train = False，optimizer_type = 'sgd'，Init_lr = 1e-2。（不冻结）
     #       其中：由于从主干网络的预训练权重开始训练，主干的权值不一定适合目标检测，需要更多的训练跳出局部最优解。
     #             UnFreeze_Epoch可以在150-300之间调整，YOLOV5和YOLOX均推荐使用300。
     #             Adam相较于SGD收敛的快一些。因此UnFreeze_Epoch理论上可以小一点，但依然推荐更多的Epoch。
@@ -161,7 +184,7 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     #   Init_lr         模型的最大学习率
     #                   当使用Adam优化器时建议设置  Init_lr=1e-4
-    #                   当使用SGD优化器时建议设置   Init_lr=1e-3
+    #                   当使用SGD优化器时建议设置   Init_lr=1e-2
     #   Min_lr          模型的最小学习率，默认为最大学习率的0.01
     #------------------------------------------------------------------#
     Init_lr             = 1e-4
@@ -169,7 +192,7 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     #   optimizer_type  使用到的优化器种类，可选的有adam、sgd
     #                   当使用Adam优化器时建议设置  Init_lr=1e-4
-    #                   当使用SGD优化器时建议设置   Init_lr=1e-3
+    #                   当使用SGD优化器时建议设置   Init_lr=1e-2
     #   momentum        优化器内部使用到的momentum参数
     #   weight_decay    权值衰减，可防止过拟合
     #                   adam会导致weight_decay错误，使用adam时建议设置为0。
@@ -200,6 +223,22 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     train_annotation_path   = '2007_train.txt'
     val_annotation_path     = '2007_val.txt'
+
+    #------------------------------------------------------#
+    #   设置用到的显卡
+    #------------------------------------------------------#
+    ngpus_per_node  = torch.cuda.device_count()
+    if distributed:
+        dist.init_process_group(backend="nccl")
+        local_rank  = int(os.environ["LOCAL_RANK"])
+        rank        = int(os.environ["RANK"])
+        device      = torch.device("cuda", local_rank)
+        if local_rank == 0:
+            print(f"[{os.getpid()}] (rank = {rank}, local_rank = {local_rank}) training...")
+            print("Gpu Device Count : ", ngpus_per_node)
+    else:
+        device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        local_rank      = 0
     
     #----------------------------------------------------#
     #   获取classes和anchor
@@ -223,11 +262,36 @@ if __name__ == "__main__":
 
     loss_history    = LossHistory(save_dir, model, input_shape=input_shape)
 
-    model_train = model.train()
+    if fp16:
+        #------------------------------------------------------------------#
+        #   torch 1.2不支持amp，建议使用torch 1.7.1及以上正确使用fp16
+        #   因此torch1.2这里显示"could not be resolve"
+        #------------------------------------------------------------------#
+        from torch.cuda.amp import GradScaler as GradScaler
+        scaler = GradScaler()
+    else:
+        scaler = None
+
+    model_train     = model.train()
+    #----------------------------#
+    #   多卡同步Bn
+    #----------------------------#
+    if sync_bn and ngpus_per_node > 1 and distributed:
+        model_train = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_train)
+    elif sync_bn:
+        print("Sync_bn is not support in one gpu or not distributed.")
+
     if Cuda:
-        model_train = torch.nn.DataParallel(model)
-        cudnn.benchmark = True
-        model_train = model_train.cuda()
+        if distributed:
+            #----------------------------#
+            #   多卡平行运行
+            #----------------------------#
+            model_train = model_train.cuda(local_rank)
+            model_train = torch.nn.parallel.DistributedDataParallel(model_train, device_ids=[local_rank], find_unused_parameters=True)
+        else:
+            model_train = torch.nn.DataParallel(model)
+            cudnn.benchmark = True
+            model_train = model_train.cuda()
 
     #---------------------------#
     #   读取数据集对应的txt
@@ -298,10 +362,21 @@ if __name__ == "__main__":
 
         train_dataset   = FRCNNDataset(train_lines, input_shape, train = True)
         val_dataset     = FRCNNDataset(val_lines, input_shape, train = False)
-        gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
-        gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
+        
+        if distributed:
+            train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
+            val_sampler     = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False,)
+            batch_size      = batch_size // ngpus_per_node
+            shuffle         = False
+        else:
+            train_sampler   = None
+            val_sampler     = None
+            shuffle         = True
+
+        gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
+                                    drop_last=True, collate_fn=frcnn_dataset_collate, sampler=train_sampler)
+        gen_val         = DataLoader(val_dataset  , shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
+                                    drop_last=True, collate_fn=frcnn_dataset_collate, sampler=val_sampler)
 
         train_util      = FasterRCNNTrainer(model_train, optimizer)
 
@@ -342,15 +417,22 @@ if __name__ == "__main__":
                 if epoch_step == 0 or epoch_step_val == 0:
                     raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
 
-                gen     = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                            drop_last=True, collate_fn=frcnn_dataset_collate)
-                gen_val = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                            drop_last=True, collate_fn=frcnn_dataset_collate)
+                if distributed:
+                    batch_size = batch_size // ngpus_per_node
+
+                gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
+                                            drop_last=True, collate_fn=frcnn_dataset_collate, sampler=train_sampler)
+                gen_val         = DataLoader(val_dataset  , shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
+                                            drop_last=True, collate_fn=frcnn_dataset_collate, sampler=val_sampler)
 
                 UnFreeze_flag = True
+
+            if distributed:
+                train_sampler.set_epoch(epoch)
                 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
             
-            fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, save_period, save_dir)
+            fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir, local_rank)
             
-        loss_history.writer.close()
+        if local_rank == 0:
+            loss_history.writer.close()

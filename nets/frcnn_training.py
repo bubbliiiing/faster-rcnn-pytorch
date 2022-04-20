@@ -1,5 +1,4 @@
 import math
-from collections import namedtuple
 from functools import partial
 
 import numpy as np
@@ -223,7 +222,7 @@ class FasterRCNNTrainer(nn.Module):
 
         sigma_squared = sigma ** 2
         regression_diff = (gt_loc - pred_loc)
-        regression_diff = regression_diff.abs()
+        regression_diff = regression_diff.abs().float()
         regression_loss = torch.where(
                 regression_diff < (1. / sigma_squared),
                 0.5 * sigma_squared * regression_diff ** 2,
@@ -264,12 +263,8 @@ class FasterRCNNTrainer(nn.Module):
             #   gt_rpn_label    [num_anchors, ]
             # -------------------------------------------------- #
             gt_rpn_loc, gt_rpn_label    = self.anchor_target_creator(bbox, anchor)
-            gt_rpn_loc                  = torch.Tensor(gt_rpn_loc)
-            gt_rpn_label                = torch.Tensor(gt_rpn_label).long()
-
-            if rpn_loc.is_cuda:
-                gt_rpn_loc = gt_rpn_loc.cuda()
-                gt_rpn_label = gt_rpn_label.cuda()
+            gt_rpn_loc                  = torch.Tensor(gt_rpn_loc).type_as(rpn_locs)
+            gt_rpn_label                = torch.Tensor(gt_rpn_label).type_as(rpn_locs).long()
 
             # -------------------------------------------------- #
             #   分别计算建议框网络的回归损失和分类损失
@@ -285,17 +280,11 @@ class FasterRCNNTrainer(nn.Module):
             #   gt_roi_label    [n_sample, ]
             # ------------------------------------------------------ #
             sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox, label, self.loc_normalize_std)
-            sample_roi          = torch.Tensor(sample_roi)
-            gt_roi_loc          = torch.Tensor(gt_roi_loc)
-            gt_roi_label        = torch.Tensor(gt_roi_label).long()
-            sample_roi_index    = torch.zeros(len(sample_roi))
+            sample_roi          = torch.Tensor(sample_roi).type_as(rpn_locs)
+            gt_roi_loc          = torch.Tensor(gt_roi_loc).type_as(rpn_locs)
+            gt_roi_label        = torch.Tensor(gt_roi_label).type_as(rpn_locs).long()
+            sample_roi_index    = torch.zeros(len(sample_roi)).type_as(rpn_locs).long()
             
-            if feature.is_cuda:
-                sample_roi          = sample_roi.cuda()
-                sample_roi_index    = sample_roi_index.cuda()
-                gt_roi_loc          = gt_roi_loc.cuda()
-                gt_roi_label        = gt_roi_label.cuda()
-
             roi_cls_loc, roi_score = self.faster_rcnn([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
 
             # ------------------------------------------------------ #
@@ -320,11 +309,24 @@ class FasterRCNNTrainer(nn.Module):
         losses = losses + [sum(losses)]
         return losses
 
-    def train_step(self, imgs, bboxes, labels, scale):
+    def train_step(self, imgs, bboxes, labels, scale, fp16=False, scaler=None):
         self.optimizer.zero_grad()
-        losses = self.forward(imgs, bboxes, labels, scale)
-        losses[-1].backward()
-        self.optimizer.step()
+        if not fp16:
+            losses = self.forward(imgs, bboxes, labels, scale)
+            losses[-1].backward()
+            self.optimizer.step()
+        else:
+            from torch.cuda.amp import autocast
+            with autocast():
+                losses = self.forward(imgs, bboxes, labels, scale)
+
+            #----------------------#
+            #   反向传播
+            #----------------------#
+            scaler.scale(losses[-1]).backward()
+            scaler.step(self.optimizer)
+            scaler.update()
+            
         return losses
 
 def weights_init(net, init_type='normal', init_gain=0.02):
@@ -347,7 +349,7 @@ def weights_init(net, init_type='normal', init_gain=0.02):
     print('initialize network with %s type' % init_type)
     net.apply(init_func)
 
-def get_lr_scheduler(lr_decay_type, lr, min_lr, total_iters, warmup_iters_ratio = 0.1, warmup_lr_ratio = 0.1, no_aug_iter_ratio = 0.1, step_num = 10):
+def get_lr_scheduler(lr_decay_type, lr, min_lr, total_iters, warmup_iters_ratio = 0.05, warmup_lr_ratio = 0.1, no_aug_iter_ratio = 0.05, step_num = 10):
     def yolox_warm_cos_lr(lr, min_lr, total_iters, warmup_total_iters, warmup_lr_start, no_aug_iter, iters):
         if iters <= warmup_total_iters:
             # lr = (lr - warmup_lr_start) * iters / float(warmup_total_iters) + warmup_lr_start
