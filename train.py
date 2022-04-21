@@ -2,14 +2,11 @@
 #       对数据集进行训练
 #-------------------------------------#
 import os
-import warnings
 
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.optim as optim
-from torch import nn
 from torch.utils.data import DataLoader
 
 from nets.frcnn import FasterRCNN
@@ -48,17 +45,11 @@ if __name__ == "__main__":
     #-------------------------------#
     Cuda            = True
     #---------------------------------------------------------------------#
-    #   distributed     用于指定是否使用单机多卡分布式运行
-    #                   终端指令仅支持Ubuntu。CUDA_VISIBLE_DEVICES用于在Ubuntu下指定显卡。
-    #                   Windows系统下默认使用DP模式调用所有显卡，不支持DDP。
-    #   DP模式：
-    #       设置            distributed = False
-    #       在终端中输入    CUDA_VISIBLE_DEVICES=0,1 python train.py
-    #   DDP模式：
-    #       设置            distributed = True
-    #       在终端中输入    CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 train.py
+    #   train_gpu   训练用到的GPU
+    #               默认为第一张卡、双卡为[0, 1]、三卡为[0, 1, 2]
+    #               在使用多GPU时，每个卡上的batch为总batch除以卡的数量。
     #---------------------------------------------------------------------#
-    distributed     = False
+    train_gpu       = [0,]
     #---------------------------------------------------------------------#
     #   fp16        是否使用混合精度训练
     #               可减少约一半的显存、需要pytorch1.7.1以上
@@ -219,47 +210,35 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     train_annotation_path   = '2007_train.txt'
     val_annotation_path     = '2007_val.txt'
-
-    #------------------------------------------------------#
-    #   设置用到的显卡
-    #------------------------------------------------------#
-    ngpus_per_node  = torch.cuda.device_count()
-    if distributed:
-        dist.init_process_group(backend="nccl")
-        local_rank  = int(os.environ["LOCAL_RANK"])
-        rank        = int(os.environ["RANK"])
-        device      = torch.device("cuda", local_rank)
-        if local_rank == 0:
-            print(f"[{os.getpid()}] (rank = {rank}, local_rank = {local_rank}) training...")
-            print("Gpu Device Count : ", ngpus_per_node)
-    else:
-        device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        local_rank      = 0
     
     #----------------------------------------------------#
     #   获取classes和anchor
     #----------------------------------------------------#
     class_names, num_classes = get_classes(classes_path)
+
+    #------------------------------------------------------#
+    #   设置用到的显卡
+    #------------------------------------------------------#
+    os.environ["CUDA_VISIBLE_DEVICES"]  = ','.join(str(x) for x in train_gpu)
+    ngpus_per_node                      = len(train_gpu)
+    print('Number of devices: {}'.format(ngpus_per_node))
     
     model = FasterRCNN(num_classes, anchor_scales = anchors_size, backbone = backbone, pretrained = pretrained)
     if not pretrained:
         weights_init(model)
     if model_path != '':
-        if local_rank == 0:
-            #------------------------------------------------------#
-            #   权值文件请看README，百度网盘下载
-            #------------------------------------------------------#
-            print('Load weights {}.'.format(model_path))
+        #------------------------------------------------------#
+        #   权值文件请看README，百度网盘下载
+        #------------------------------------------------------#
+        print('Load weights {}.'.format(model_path))
+        device          = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model_dict      = model.state_dict()
         pretrained_dict = torch.load(model_path, map_location = device)
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if np.shape(model_dict[k]) == np.shape(v)}
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
 
-    if local_rank == 0:
-        loss_history = LossHistory(save_dir, model, input_shape=input_shape)
-    else:
-        loss_history = None
+    loss_history = LossHistory(save_dir, model, input_shape=input_shape)
         
     if fp16:
         #------------------------------------------------------------------#
@@ -273,16 +252,9 @@ if __name__ == "__main__":
 
     model_train     = model.train()
     if Cuda:
-        if distributed:
-            #----------------------------#
-            #   多卡平行运行
-            #----------------------------#
-            model_train = model_train.cuda(local_rank)
-            model_train = torch.nn.parallel.DistributedDataParallel(model_train, device_ids=[local_rank], find_unused_parameters=True)
-        else:
-            model_train = torch.nn.DataParallel(model)
-            cudnn.benchmark = True
-            model_train = model_train.cuda()
+        model_train = torch.nn.DataParallel(model_train)
+        cudnn.benchmark = True
+        model_train = model_train.cuda()
 
     #---------------------------#
     #   读取数据集对应的txt
@@ -353,23 +325,13 @@ if __name__ == "__main__":
 
         train_dataset   = FRCNNDataset(train_lines, input_shape, train = True)
         val_dataset     = FRCNNDataset(val_lines, input_shape, train = False)
-        
-        if distributed:
-            train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
-            val_sampler     = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False,)
-            batch_size      = batch_size // ngpus_per_node
-            shuffle         = False
-        else:
-            train_sampler   = None
-            val_sampler     = None
-            shuffle         = True
 
-        gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate, sampler=train_sampler)
-        gen_val         = DataLoader(val_dataset  , shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                    drop_last=True, collate_fn=frcnn_dataset_collate, sampler=val_sampler)
+        gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
+                                    drop_last=True, collate_fn=frcnn_dataset_collate)
+        gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
+                                    drop_last=True, collate_fn=frcnn_dataset_collate)
 
-        train_util      = FasterRCNNTrainer(model_train, optimizer)
+        train_util      = FasterRCNNTrainer(model_train, model, optimizer)
 
         #---------------------------------------#
         #   开始模型训练
@@ -408,22 +370,15 @@ if __name__ == "__main__":
                 if epoch_step == 0 or epoch_step_val == 0:
                     raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
 
-                if distributed:
-                    batch_size = batch_size // ngpus_per_node
-
-                gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                            drop_last=True, collate_fn=frcnn_dataset_collate, sampler=train_sampler)
-                gen_val         = DataLoader(val_dataset  , shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                            drop_last=True, collate_fn=frcnn_dataset_collate, sampler=val_sampler)
+                gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
+                                            drop_last=True, collate_fn=frcnn_dataset_collate)
+                gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
+                                            drop_last=True, collate_fn=frcnn_dataset_collate)
 
                 UnFreeze_flag = True
-
-            if distributed:
-                train_sampler.set_epoch(epoch)
                 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
             
-            fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir, local_rank)
+            fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir)
             
-        if local_rank == 0:
-            loss_history.writer.close()
+        loss_history.writer.close()

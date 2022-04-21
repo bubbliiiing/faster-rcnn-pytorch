@@ -78,6 +78,7 @@ class FasterRCNN(nn.Module):
             #   获得建议框
             #---------------------------------#
             _, _, rois, roi_indices, _  = self.rpn.forward(base_feature, img_size, scale)
+            rois, roi_indices           = rois.squeeze(0), roi_indices.squeeze(0)
             #---------------------------------------#
             #   获得classifier的分类结果和回归结果
             #---------------------------------------#

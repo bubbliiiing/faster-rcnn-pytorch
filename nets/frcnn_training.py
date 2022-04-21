@@ -203,9 +203,10 @@ class ProposalTargetCreator(object):
         return sample_roi, gt_roi_loc, gt_roi_label
 
 class FasterRCNNTrainer(nn.Module):
-    def __init__(self, faster_rcnn, optimizer):
+    def __init__(self, model_train, model, optimizer):
         super(FasterRCNNTrainer, self).__init__()
-        self.faster_rcnn    = faster_rcnn
+        self.model_train    = model_train
+        self.model          = model
         self.optimizer      = optimizer
 
         self.rpn_sigma      = 1
@@ -240,12 +241,12 @@ class FasterRCNNTrainer(nn.Module):
         #-------------------------------#
         #   获取公用特征层
         #-------------------------------#
-        base_feature = self.faster_rcnn(imgs, mode = 'extractor')
+        base_feature = self.model_train(imgs, mode = 'extractor')
 
         # -------------------------------------------------- #
         #   利用rpn网络获得调整参数、得分、建议框、先验框
         # -------------------------------------------------- #
-        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.faster_rcnn(x = [base_feature, img_size], scale = scale, mode = 'rpn')
+        rpn_locs, rpn_scores, rois, roi_indices, anchor = self.model_train(x = [base_feature, img_size], scale = scale, mode = 'rpn')
         
         rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all = 0, 0, 0, 0
         for i in range(n):
@@ -253,19 +254,17 @@ class FasterRCNNTrainer(nn.Module):
             label       = labels[i]
             rpn_loc     = rpn_locs[i]
             rpn_score   = rpn_scores[i]
-            roi         = rois[roi_indices == i]
+            roi         = rois[i]
             feature     = base_feature[i]
-
             # -------------------------------------------------- #
             #   利用真实框和先验框获得建议框网络应该有的预测结果
             #   给每个先验框都打上标签
             #   gt_rpn_loc      [num_anchors, 4]
             #   gt_rpn_label    [num_anchors, ]
             # -------------------------------------------------- #
-            gt_rpn_loc, gt_rpn_label    = self.anchor_target_creator(bbox, anchor)
+            gt_rpn_loc, gt_rpn_label    = self.anchor_target_creator(bbox, anchor[0].cpu().numpy())
             gt_rpn_loc                  = torch.Tensor(gt_rpn_loc).type_as(rpn_locs)
             gt_rpn_label                = torch.Tensor(gt_rpn_label).type_as(rpn_locs).long()
-
             # -------------------------------------------------- #
             #   分别计算建议框网络的回归损失和分类损失
             # -------------------------------------------------- #
@@ -285,7 +284,7 @@ class FasterRCNNTrainer(nn.Module):
             gt_roi_label        = torch.Tensor(gt_roi_label).type_as(rpn_locs).long()
             sample_roi_index    = torch.zeros(len(sample_roi)).type_as(rpn_locs).long()
             
-            roi_cls_loc, roi_score = self.faster_rcnn([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
+            roi_cls_loc, roi_score = self.model_train([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
 
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果

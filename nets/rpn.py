@@ -51,9 +51,7 @@ class ProposalCreator():
         #-----------------------------------#
         #   将先验框转换成tensor
         #-----------------------------------#
-        anchor = torch.from_numpy(anchor)
-        if loc.is_cuda:
-            anchor = anchor.cuda()
+        anchor = torch.from_numpy(anchor).type_as(loc)
         #-----------------------------------#
         #   将RPN网络预测结果转化成建议框
         #-----------------------------------#
@@ -168,21 +166,19 @@ class RegionProposalNetwork(nn.Module):
         #   生成先验框，此时获得的anchor是布满网格点的，当输入图片为600,600,3的时候，shape为(12996, 4)
         #------------------------------------------------------------------------------------------------#
         anchor = _enumerate_shifted_anchor(np.array(self.anchor_base), self.feat_stride, h, w)
-        
         rois        = list()
         roi_indices = list()
         for i in range(n):
             roi         = self.proposal_layer(rpn_locs[i], rpn_fg_scores[i], anchor, img_size, scale = scale)
             batch_index = i * torch.ones((len(roi),))
-            rois.append(roi)
-            roi_indices.append(batch_index)
+            rois.append(roi.unsqueeze(0))
+            roi_indices.append(batch_index.unsqueeze(0))
 
-        rois        = torch.cat(rois, dim=0)
-        roi_indices = torch.cat(roi_indices, dim=0)
-
+        rois        = torch.cat(rois, dim=0).type_as(x)
+        roi_indices = torch.cat(roi_indices, dim=0).type_as(x)
+        anchor      = torch.from_numpy(anchor).unsqueeze(0).type_as(x)
+        
         return rpn_locs, rpn_scores, rois, roi_indices, anchor
-
-
 
 def normal_init(m, mean, stddev, truncated=False):
     if truncated:
