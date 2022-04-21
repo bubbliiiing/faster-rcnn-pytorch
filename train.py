@@ -60,10 +60,6 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------#
     distributed     = False
     #---------------------------------------------------------------------#
-    #   sync_bn     是否使用sync_bn，DDP模式多卡可用
-    #---------------------------------------------------------------------#
-    sync_bn         = False
-    #---------------------------------------------------------------------#
     #   fp16        是否使用混合精度训练
     #               可减少约一半的显存、需要pytorch1.7.1以上
     #---------------------------------------------------------------------#
@@ -273,14 +269,6 @@ if __name__ == "__main__":
         scaler = None
 
     model_train     = model.train()
-    #----------------------------#
-    #   多卡同步Bn
-    #----------------------------#
-    if sync_bn and ngpus_per_node > 1 and distributed:
-        model_train = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_train)
-    elif sync_bn:
-        print("Sync_bn is not support in one gpu or not distributed.")
-
     if Cuda:
         if distributed:
             #----------------------------#
