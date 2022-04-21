@@ -248,14 +248,14 @@ class FasterRCNNTrainer(nn.Module):
         # -------------------------------------------------- #
         rpn_locs, rpn_scores, rois, roi_indices, anchor = self.model_train(x = [base_feature, img_size], scale = scale, mode = 'rpn')
         
-        rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all = 0, 0, 0, 0
+        rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all  = 0, 0, 0, 0
+        sample_rois, sample_indexes, gt_roi_locs, gt_roi_labels                 = [], [], [], []
         for i in range(n):
             bbox        = bboxes[i]
             label       = labels[i]
             rpn_loc     = rpn_locs[i]
             rpn_score   = rpn_scores[i]
             roi         = rois[i]
-            feature     = base_feature[i]
             # -------------------------------------------------- #
             #   利用真实框和先验框获得建议框网络应该有的预测结果
             #   给每个先验框都打上标签
@@ -279,25 +279,34 @@ class FasterRCNNTrainer(nn.Module):
             #   gt_roi_label    [n_sample, ]
             # ------------------------------------------------------ #
             sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox, label, self.loc_normalize_std)
-            sample_roi          = torch.Tensor(sample_roi).type_as(rpn_locs)
-            gt_roi_loc          = torch.Tensor(gt_roi_loc).type_as(rpn_locs)
-            gt_roi_label        = torch.Tensor(gt_roi_label).type_as(rpn_locs).long()
-            sample_roi_index    = torch.zeros(len(sample_roi)).type_as(rpn_locs).long()
+            sample_rois.append(torch.Tensor(sample_roi).type_as(rpn_locs))
+            sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs).long() * roi_indices[i][0])
+            gt_roi_locs.append(torch.Tensor(gt_roi_loc).type_as(rpn_locs))
+            gt_roi_labels.append(torch.Tensor(gt_roi_label).type_as(rpn_locs).long())
             
-            roi_cls_loc, roi_score = self.model([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
+        sample_rois     = torch.stack(sample_rois, dim=0)
+        sample_indexes  = torch.stack(sample_indexes, dim=0)
+        roi_cls_locs, roi_scores = self.model([base_feature, sample_rois, sample_indexes, img_size], mode = 'head')
 
+        for i in range(n):
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果
             # ------------------------------------------------------ #
-            n_sample = roi_cls_loc.size()[1]
+            n_sample = roi_cls_locs.size()[1]
+            
+            roi_cls_loc     = roi_cls_locs[i]
+            roi_score       = roi_scores[i]
+            gt_roi_loc      = gt_roi_locs[i]
+            gt_roi_label    = gt_roi_labels[i]
+            
             roi_cls_loc = roi_cls_loc.view(n_sample, -1, 4)
-            roi_loc = roi_cls_loc[torch.arange(0, n_sample), gt_roi_label]
+            roi_loc     = roi_cls_loc[torch.arange(0, n_sample), gt_roi_label]
 
             # -------------------------------------------------- #
             #   分别计算Classifier网络的回归损失和分类损失
             # -------------------------------------------------- #
             roi_loc_loss = self._fast_rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label.data, self.roi_sigma)
-            roi_cls_loss = nn.CrossEntropyLoss()(roi_score[0], gt_roi_label)
+            roi_cls_loss = nn.CrossEntropyLoss()(roi_score, gt_roi_label)
 
             rpn_loc_loss_all += rpn_loc_loss
             rpn_cls_loss_all += rpn_cls_loss

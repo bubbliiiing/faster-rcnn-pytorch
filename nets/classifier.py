@@ -31,6 +31,8 @@ class VGG16RoIHead(nn.Module):
         if x.is_cuda:
             roi_indices = roi_indices.cuda()
             rois = rois.cuda()
+        rois        = torch.flatten(rois, 0, 1)
+        roi_indices = torch.flatten(roi_indices, 0, 1)
 
         rois_feature_map = torch.zeros_like(rois)
         rois_feature_map[:, [0,2]] = rois[:, [0,2]] / img_size[1] * x.size()[3]
@@ -82,6 +84,8 @@ class Resnet50RoIHead(nn.Module):
         if x.is_cuda:
             roi_indices = roi_indices.cuda()
             rois = rois.cuda()
+        rois        = torch.flatten(rois, 0, 1)
+        roi_indices = torch.flatten(roi_indices, 0, 1)
         
         rois_feature_map = torch.zeros_like(rois)
         rois_feature_map[:, [0,2]] = rois[:, [0,2]] / img_size[1] * x.size()[3]
