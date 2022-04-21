@@ -245,7 +245,7 @@ if __name__ == "__main__":
     if not pretrained:
         weights_init(model)
     if model_path != '':
-        if local_rank:
+        if local_rank == 0:
             #------------------------------------------------------#
             #   权值文件请看README，百度网盘下载
             #------------------------------------------------------#
@@ -256,8 +256,11 @@ if __name__ == "__main__":
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
 
-    loss_history    = LossHistory(save_dir, model, input_shape=input_shape)
-
+    if local_rank == 0:
+        loss_history = LossHistory(save_dir, model, input_shape=input_shape)
+    else:
+        loss_history = None
+        
     if fp16:
         #------------------------------------------------------------------#
         #   torch 1.2不支持amp，建议使用torch 1.7.1及以上正确使用fp16
