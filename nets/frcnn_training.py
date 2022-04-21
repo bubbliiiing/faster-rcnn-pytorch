@@ -284,7 +284,7 @@ class FasterRCNNTrainer(nn.Module):
             gt_roi_label        = torch.Tensor(gt_roi_label).type_as(rpn_locs).long()
             sample_roi_index    = torch.zeros(len(sample_roi)).type_as(rpn_locs).long()
             
-            roi_cls_loc, roi_score = self.model_train([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
+            roi_cls_loc, roi_score = self.model([torch.unsqueeze(feature, 0), sample_roi, sample_roi_index, img_size], mode = 'head')
 
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果
