@@ -203,10 +203,9 @@ class ProposalTargetCreator(object):
         return sample_roi, gt_roi_loc, gt_roi_label
 
 class FasterRCNNTrainer(nn.Module):
-    def __init__(self, model_train, model, optimizer):
+    def __init__(self, model_train, optimizer):
         super(FasterRCNNTrainer, self).__init__()
         self.model_train    = model_train
-        self.model          = model
         self.optimizer      = optimizer
 
         self.rpn_sigma      = 1
@@ -271,6 +270,8 @@ class FasterRCNNTrainer(nn.Module):
             rpn_loc_loss = self._fast_rcnn_loc_loss(rpn_loc, gt_rpn_loc, gt_rpn_label, self.rpn_sigma)
             rpn_cls_loss = F.cross_entropy(rpn_score, gt_rpn_label, ignore_index=-1)
   
+            rpn_loc_loss_all += rpn_loc_loss
+            rpn_cls_loss_all += rpn_cls_loss
             # ------------------------------------------------------ #
             #   利用真实框和建议框获得classifier网络应该有的预测结果
             #   获得三个变量，分别是sample_roi, gt_roi_loc, gt_roi_label
@@ -286,8 +287,7 @@ class FasterRCNNTrainer(nn.Module):
             
         sample_rois     = torch.stack(sample_rois, dim=0)
         sample_indexes  = torch.stack(sample_indexes, dim=0)
-        roi_cls_locs, roi_scores = self.model([base_feature, sample_rois, sample_indexes, img_size], mode = 'head')
-
+        roi_cls_locs, roi_scores = self.model_train([base_feature, sample_rois, sample_indexes, img_size], mode = 'head')
         for i in range(n):
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果
@@ -308,8 +308,6 @@ class FasterRCNNTrainer(nn.Module):
             roi_loc_loss = self._fast_rcnn_loc_loss(roi_loc, gt_roi_loc, gt_roi_label.data, self.roi_sigma)
             roi_cls_loss = nn.CrossEntropyLoss()(roi_score, gt_roi_label)
 
-            rpn_loc_loss_all += rpn_loc_loss
-            rpn_cls_loss_all += rpn_cls_loss
             roi_loc_loss_all += roi_loc_loss
             roi_cls_loss_all += roi_cls_loss
             

@@ -331,7 +331,7 @@ if __name__ == "__main__":
         gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
 
-        train_util      = FasterRCNNTrainer(model_train, model, optimizer)
+        train_util      = FasterRCNNTrainer(model_train, optimizer)
 
         #---------------------------------------#
         #   开始模型训练
