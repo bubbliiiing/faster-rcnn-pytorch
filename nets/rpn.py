@@ -176,7 +176,7 @@ class RegionProposalNetwork(nn.Module):
 
         rois        = torch.cat(rois, dim=0).type_as(x)
         roi_indices = torch.cat(roi_indices, dim=0).type_as(x)
-        anchor      = torch.from_numpy(anchor).unsqueeze(0).float()
+        anchor      = torch.from_numpy(anchor).unsqueeze(0).float().to(x.device)
         
         return rpn_locs, rpn_scores, rois, roi_indices, anchor
 
