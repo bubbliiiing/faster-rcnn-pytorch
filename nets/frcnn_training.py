@@ -281,7 +281,7 @@ class FasterRCNNTrainer(nn.Module):
             # ------------------------------------------------------ #
             sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox, label, self.loc_normalize_std)
             sample_rois.append(torch.Tensor(sample_roi).type_as(rpn_locs))
-            sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs).long() * roi_indices[i][0])
+            sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs) * roi_indices[i][0])
             gt_roi_locs.append(torch.Tensor(gt_roi_loc).type_as(rpn_locs))
             gt_roi_labels.append(torch.Tensor(gt_roi_label).type_as(rpn_locs).long())
             
