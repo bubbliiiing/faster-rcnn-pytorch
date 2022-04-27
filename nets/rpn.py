@@ -87,6 +87,9 @@ class ProposalCreator():
         #   使用官方的非极大抑制会快非常多
         #-----------------------------------#
         keep    = nms(roi, score, self.nms_iou)
+        if len(keep) < n_post_nms:
+            index_extra = np.random.choice(range(len(keep)), size=(n_post_nms - len(keep)), replace=True)
+            keep        = torch.cat([keep, keep[index_extra]])
         keep    = keep[:n_post_nms]
         roi     = roi[keep]
         return roi
