@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from nets.frcnn import FasterRCNN
 from utils.utils import (cvtColor, get_classes, get_new_img_size, resize_image,
-                         preprocess_input)
+                         preprocess_input, show_config)
 from utils.utils_bbox import DecodeBox
 
 
@@ -67,6 +67,7 @@ class FRCNN(object):
     #---------------------------------------------------#
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults)
+        show_config(**self._defaults)
         for name, value in kwargs.items():
             setattr(self, name, value)
         #---------------------------------------------------#
