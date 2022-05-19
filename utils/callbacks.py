@@ -174,9 +174,8 @@ class EvalCallback():
         f.close()
         return 
     
-    def on_epoch_end(self, epoch, model_eval):
+    def on_epoch_end(self, epoch):
         if epoch % self.period == 0 and self.eval_flag:
-            self.net = model_eval
             if not os.path.exists(self.map_out_path):
                 os.makedirs(self.map_out_path)
             if not os.path.exists(os.path.join(self.map_out_path, "ground-truth")):
