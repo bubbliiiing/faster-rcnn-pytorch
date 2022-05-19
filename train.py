@@ -2,6 +2,7 @@
 #       对数据集进行训练
 #-------------------------------------#
 import os
+import datetime
 
 import numpy as np
 import torch
@@ -12,7 +13,7 @@ from torch.utils.data import DataLoader
 from nets.frcnn import FasterRCNN
 from nets.frcnn_training import (FasterRCNNTrainer, get_lr_scheduler,
                                  set_optimizer_lr, weights_init)
-from utils.callbacks import LossHistory
+from utils.callbacks import EvalCallback, LossHistory
 from utils.dataloader import FRCNNDataset, frcnn_dataset_collate
 from utils.utils import get_classes, show_config
 from utils.utils_fit import fit_one_epoch
@@ -197,6 +198,17 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     save_dir            = 'logs'
     #------------------------------------------------------------------#
+    #   eval_flag       是否在训练时进行评估，评估对象为验证集
+    #                   安装pycocotools库后，评估体验更佳。
+    #   eval_period     代表多少个epoch评估一次，不建议频繁的评估
+    #                   评估需要消耗较多的时间，频繁评估会导致训练非常慢
+    #   此处获得的mAP会与get_map.py获得的会有所不同，原因有二：
+    #   （一）此处获得的mAP为验证集的mAP。
+    #   （二）此处设置评估参数较为保守，目的是加快评估速度。
+    #------------------------------------------------------------------#
+    eval_flag           = True
+    eval_period         = 5
+    #------------------------------------------------------------------#
     #   num_workers     用于设置是否使用多线程读取数据，1代表关闭多线程
     #                   开启后会加快数据读取速度，但是会占用更多内存
     #                   在IO为瓶颈的时候再开启多线程，即GPU运算速度远大于读取图片的速度。
@@ -254,7 +266,9 @@ if __name__ == "__main__":
     #----------------------#
     #   记录Loss
     #----------------------#
-    loss_history = LossHistory(save_dir, model, input_shape=input_shape)
+    time_str        = datetime.datetime.strftime(datetime.datetime.now(),'%Y_%m_%d_%H_%M_%S')
+    log_dir         = os.path.join(save_dir, "loss_" + str(time_str))
+    loss_history    = LossHistory(log_dir, model, input_shape=input_shape)
 
     #------------------------------------------------------------------#
     #   torch 1.2不支持amp，建议使用torch 1.7.1及以上正确使用fp16
@@ -368,6 +382,11 @@ if __name__ == "__main__":
                                     drop_last=True, collate_fn=frcnn_dataset_collate)
 
         train_util      = FasterRCNNTrainer(model_train, optimizer)
+        #----------------------#
+        #   记录eval的map曲线
+        #----------------------#
+        eval_callback   = EvalCallback(model_train, input_shape, class_names, num_classes, val_lines, log_dir, Cuda, \
+                                        eval_flag=eval_flag, period=eval_period)
 
         #---------------------------------------#
         #   开始模型训练
@@ -415,6 +434,6 @@ if __name__ == "__main__":
                 
             set_optimizer_lr(optimizer, lr_scheduler_func, epoch)
             
-            fit_one_epoch(model, train_util, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir)
+            fit_one_epoch(model, train_util, loss_history, eval_callback, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, UnFreeze_Epoch, Cuda, fp16, scaler, save_period, save_dir)
             
         loss_history.writer.close()
