@@ -50,7 +50,6 @@ def bbox2loc(src_bbox, dst_bbox):
     base_ctr_y = dst_bbox[:, 1] + 0.5 * base_height
 
     eps = torch.finfo(height.dtype).eps
-    # print(eps)
     epst = torch.empty(len(height)).cuda()
     epst.fill_(eps)
     width = torch.maximum(width, epst)
@@ -109,10 +108,7 @@ class AnchorTargetCreator(object):
         #   anchor和bbox的iou
         #   获得的ious的shape为[num_anchors, num_gt]
         #----------------------------------------------#
-        # iousO = bbox_iou(anchor.cpu().numpy(), bbox.cpu().numpy())
         ious = bbox_iou(anchor, bbox)
-        # print("iou_numpy:", iousO)
-        # print("iou_tensor:", ious)
 
         if len(bbox) == 0:
             return torch.zeros(len(anchor)), torch.zeros(len(anchor)), torch.zeros(len(bbox))
@@ -123,10 +119,7 @@ class AnchorTargetCreator(object):
         #---------------------------------------------------------#
         #   找出每一个先验框最对应的真实框的iou  [num_anchors, ]
         #---------------------------------------------------------#
-        # max_iousO = np.max(iousO, axis=1)
         max_ious, _ = torch.max(ious, dim=1)
-        # print("iou_numpy:", max_iousO)
-        # print("iou_tensor:", max_ious)
         #---------------------------------------------------------#
         #   获得每一个真实框最对应的先验框  [num_gt, ]
         #---------------------------------------------------------#
@@ -429,12 +422,12 @@ class FasterRCNNTrainer(nn.Module):
         self.roi_sigma      = 1
 
         #numpy
-        self.anchor_target_creatornp = AnchorTargetCreatornp()
-        self.proposal_target_creatornp = ProposalTargetCreatornp()
+        # self.anchor_target_creatornp = AnchorTargetCreatornp()
+        # self.proposal_target_creatornp = ProposalTargetCreatornp()
 
         #pytorch
-        # self.anchor_target_creator      = AnchorTargetCreator()
-        # self.proposal_target_creator    = ProposalTargetCreator()
+        self.anchor_target_creator      = AnchorTargetCreator()
+        self.proposal_target_creator    = ProposalTargetCreator()
 
 
         self.loc_normalize_std          = [0.1, 0.1, 0.2, 0.2]
@@ -464,25 +457,10 @@ class FasterRCNNTrainer(nn.Module):
         #   获取公用特征层
         #-------------------------------#
         base_feature = self.model_train(imgs, mode = 'extractor')
-        #print("base_feature.shape")
-        #print(base_feature.shape)
-        # -------------------------------#
-        #   获取公用特征层一致性损失
-        # -------------------------------#
-        #print(base_feature[0],base_feature[8])
-        #loss_distance = F.pairwise_distance(base_feature[0:8], base_feature[8:], p=2)
-        #loss_dis = loss_distance.mean()
-        #print(loss_dis)
-        #similarity = torch.cosine_similarity(base_feature[0:8], base_feature[8:], dim=1)
-        #loss_si = 1 - similarity.mean()
-        #print(loss_si)
-        # loss = loss + loss_dis
-
         # -------------------------------------------------- #
         #   利用rpn网络获得调整参数、得分、建议框、先验框
         # -------------------------------------------------- #
         rpn_locs, rpn_scores, rois, roi_indices, anchor = self.model_train(x = [base_feature, img_size], scale = scale, mode = 'rpn')
-        
         rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all  = 0, 0, 0, 0
         sample_rois, sample_indexes, gt_roi_locs, gt_roi_labels                 = [], [], [], []
         for i in range(n):
@@ -499,16 +477,16 @@ class FasterRCNNTrainer(nn.Module):
             # -------------------------------------------------- #
 
             #numpy
-            gt_rpn_loc, gt_rpn_label = self.anchor_target_creatornp(bbox, anchor[0].cpu().numpy())
-            gt_rpn_loc = torch.Tensor(gt_rpn_loc).type_as(rpn_locs)
-            gt_rpn_label = torch.Tensor(gt_rpn_label).type_as(rpn_locs).long()
+            # gt_rpn_loc, gt_rpn_label = self.anchor_target_creatornp(bbox, anchor[0].cpu().numpy())
+            # gt_rpn_loc = torch.Tensor(gt_rpn_loc).type_as(rpn_locs)
+            # gt_rpn_label = torch.Tensor(gt_rpn_label).type_as(rpn_locs).long()
 
             #pytorch
-            # bbox = torch.from_numpy(bbox).cuda()
-            # label = torch.from_numpy(label).cuda()
-            # gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(bbox, anchor[0])
-            # gt_rpn_loc = gt_rpn_loc.type_as(rpn_locs)
-            # gt_rpn_label = gt_rpn_label.type_as(rpn_locs).long()
+            bbox = torch.from_numpy(bbox).cuda()
+            label = torch.from_numpy(label).cuda()
+            gt_rpn_loc, gt_rpn_label = self.anchor_target_creator(bbox, anchor[0])
+            gt_rpn_loc = gt_rpn_loc.type_as(rpn_locs)
+            gt_rpn_label = gt_rpn_label.type_as(rpn_locs).long()
 
             # -------------------------------------------------- #
             #   分别计算建议框网络的回归损失和分类损失
@@ -526,18 +504,18 @@ class FasterRCNNTrainer(nn.Module):
             #   gt_roi_label    [n_sample, ]
             # ------------------------------------------------------ #
             #numpy
-            sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creatornp(roi, bbox, label, self.loc_normalize_std)
-            sample_rois.append(torch.Tensor(sample_roi).type_as(rpn_locs))
-            sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs) * roi_indices[i][0])
-            gt_roi_locs.append(torch.Tensor(gt_roi_loc).type_as(rpn_locs))
-            gt_roi_labels.append(torch.Tensor(gt_roi_label).type_as(rpn_locs).long())
+            # sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creatornp(roi, bbox, label, self.loc_normalize_std)
+            # sample_rois.append(torch.Tensor(sample_roi).type_as(rpn_locs))
+            # sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs) * roi_indices[i][0])
+            # gt_roi_locs.append(torch.Tensor(gt_roi_loc).type_as(rpn_locs))
+            # gt_roi_labels.append(torch.Tensor(gt_roi_label).type_as(rpn_locs).long())
 
             #pytorch
-            # sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox, label, self.loc_normalize_std)
-            # sample_rois.append(sample_roi.type_as(rpn_locs))
-            # sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs) * roi_indices[i][0])
-            # gt_roi_locs.append(gt_roi_loc.type_as(rpn_locs))
-            # gt_roi_labels.append(gt_roi_label.type_as(rpn_locs).long())
+            sample_roi, gt_roi_loc, gt_roi_label = self.proposal_target_creator(roi, bbox, label, self.loc_normalize_std)
+            sample_rois.append(sample_roi.type_as(rpn_locs))
+            sample_indexes.append(torch.ones(len(sample_roi)).type_as(rpn_locs) * roi_indices[i][0])
+            gt_roi_locs.append(gt_roi_loc.type_as(rpn_locs))
+            gt_roi_labels.append(gt_roi_label.type_as(rpn_locs).long())
             
         sample_rois     = torch.stack(sample_rois, dim=0)
         sample_indexes  = torch.stack(sample_indexes, dim=0)
