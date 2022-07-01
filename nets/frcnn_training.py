@@ -26,16 +26,6 @@ def bbox_iou(bbox_a, bbox_b):
     return iou
 
 
-def Tbbox_iou(bbox_a, bbox_b):
-    def box_area(box):
-        return (box[2] - box[0]) * (box[3] - box[1])
-
-    area1 = box_area(bbox_a.T)
-    area2 = box_area(bbox_b.T)
-    inter = (torch.min(bbox_a[:, None, 2:], bbox_b[:, 2:]) - torch.max(bbox_a[:, None, :2], bbox_b[:, :2])).clamp(0).prod(2)
-    return inter / (area1[:, None] + area2 - inter)  # iou = inter / (area1 + area2 - inter)
-
-
 def bbox_iounp(bbox_a, bbox_b):
     if bbox_a.shape[1] != 4 or bbox_b.shape[1] != 4:
         print(bbox_a, bbox_b)
@@ -473,7 +463,6 @@ class FasterRCNNTrainer(nn.Module):
         #-------------------------------#
         #   获取公用特征层
         #-------------------------------#
-        at = time.time()
         base_feature = self.model_train(imgs, mode = 'extractor')
         #print("base_feature.shape")
         #print(base_feature.shape)
@@ -492,9 +481,7 @@ class FasterRCNNTrainer(nn.Module):
         # -------------------------------------------------- #
         #   利用rpn网络获得调整参数、得分、建议框、先验框
         # -------------------------------------------------- #
-        bt = time.time()
         rpn_locs, rpn_scores, rois, roi_indices, anchor = self.model_train(x = [base_feature, img_size], scale = scale, mode = 'rpn')
-        kt = time.time()
         
         rpn_loc_loss_all, rpn_cls_loss_all, roi_loc_loss_all, roi_cls_loss_all  = 0, 0, 0, 0
         sample_rois, sample_indexes, gt_roi_locs, gt_roi_labels                 = [], [], [], []
@@ -556,7 +543,6 @@ class FasterRCNNTrainer(nn.Module):
         sample_indexes  = torch.stack(sample_indexes, dim=0)
         roi_cls_locs, roi_scores = self.model_train([base_feature, sample_rois, sample_indexes, img_size], mode = 'head')
 
-        ct = time.time()
         for i in range(n):
             # ------------------------------------------------------ #
             #   根据建议框的种类，取出对应的回归预测结果
@@ -579,13 +565,6 @@ class FasterRCNNTrainer(nn.Module):
 
             roi_loc_loss_all += roi_loc_loss
             roi_cls_loss_all += roi_cls_loss
-
-        dt = time.time()
-
-        # print("backbone", bt - at)
-        # print("rpn", ct - bt)
-        # print("rpn_net:", kt-bt)
-        # print("head", dt - ct)
             
         losses = [rpn_loc_loss_all/n, rpn_cls_loss_all/n, roi_loc_loss_all/n, roi_cls_loss_all/n]
         losses = losses + [sum(losses)]
@@ -599,10 +578,8 @@ class FasterRCNNTrainer(nn.Module):
             self.optimizer.step()
         else:
             from torch.cuda.amp import autocast
-            at = time.time()
             with autocast():
                 losses = self.forward(imgs, bboxes, labels, scale)
-            bt = time.time()
 
             #----------------------#
             #   反向传播
@@ -610,9 +587,6 @@ class FasterRCNNTrainer(nn.Module):
             scaler.scale(losses[-1]).backward()
             scaler.step(self.optimizer)
             scaler.update()
-            ct = time.time()
-            print("forward", bt-at)
-            print("backward", ct-bt)
             
         return losses
 
