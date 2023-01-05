@@ -34,8 +34,8 @@ voc_weights_vgg.pth是vgg为主干特征提取网络用到的；
 提取码: 8mgp    
 
 VOC数据集下载地址如下，里面已经包括了训练集、测试集、验证集（与测试集一样），无需再次划分：  
-链接: https://pan.baidu.com/s/1YuBbBKxm2FGgTU5OfaeC5A    
-提取码: uack   
+链接: https://pan.baidu.com/s/1-1Ej6dayrx3g0iAA88uY5A    
+提取码: ph32   
 
 ## 训练步骤
 ### a、训练VOC07+12数据集
