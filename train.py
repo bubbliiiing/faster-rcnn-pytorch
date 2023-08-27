@@ -1,8 +1,9 @@
 #-------------------------------------#
 #       对数据集进行训练
 #-------------------------------------#
-import os
 import datetime
+import os
+from functools import partial
 
 import numpy as np
 import torch
@@ -15,7 +16,8 @@ from nets.frcnn_training import (FasterRCNNTrainer, get_lr_scheduler,
                                  set_optimizer_lr, weights_init)
 from utils.callbacks import EvalCallback, LossHistory
 from utils.dataloader import FRCNNDataset, frcnn_dataset_collate
-from utils.utils import get_classes, show_config
+from utils.utils import (get_classes, seed_everything, show_config,
+                         worker_init_fn)
 from utils.utils_fit import fit_one_epoch
 
 '''
@@ -40,6 +42,11 @@ if __name__ == "__main__":
     #   没有GPU可以设置成False
     #-------------------------------#
     Cuda            = True
+    #----------------------------------------------#
+    #   Seed    用于固定随机种子
+    #           使得每次独立训练都可以获得一样的结果
+    #----------------------------------------------#
+    seed            = 11
     #---------------------------------------------------------------------#
     #   train_gpu   训练用到的GPU
     #               默认为第一张卡、双卡为[0, 1]、三卡为[0, 1, 2]
@@ -231,6 +238,7 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"]  = ','.join(str(x) for x in train_gpu)
     ngpus_per_node                      = len(train_gpu)
     print('Number of devices: {}'.format(ngpus_per_node))
+    seed_everything(seed)
     
     model = FasterRCNN(num_classes, anchor_scales = anchors_size, backbone = backbone, pretrained = pretrained)
     if not pretrained:
@@ -379,9 +387,11 @@ if __name__ == "__main__":
         val_dataset     = FRCNNDataset(val_lines, input_shape, train = False)
 
         gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
+                                    drop_last=True, collate_fn=frcnn_dataset_collate, 
+                                    worker_init_fn=partial(worker_init_fn, rank=0, seed=seed))
         gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                    drop_last=True, collate_fn=frcnn_dataset_collate)
+                                    drop_last=True, collate_fn=frcnn_dataset_collate, 
+                                    worker_init_fn=partial(worker_init_fn, rank=0, seed=seed))
 
         train_util      = FasterRCNNTrainer(model_train, optimizer)
         #----------------------#
@@ -428,9 +438,11 @@ if __name__ == "__main__":
                     raise ValueError("数据集过小，无法继续进行训练，请扩充数据集。")
 
                 gen             = DataLoader(train_dataset, shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
-                                            drop_last=True, collate_fn=frcnn_dataset_collate)
+                                            drop_last=True, collate_fn=frcnn_dataset_collate, 
+                                            worker_init_fn=partial(worker_init_fn, rank=0, seed=seed))
                 gen_val         = DataLoader(val_dataset  , shuffle = True, batch_size = batch_size, num_workers = num_workers, pin_memory=True, 
-                                            drop_last=True, collate_fn=frcnn_dataset_collate)
+                                            drop_last=True, collate_fn=frcnn_dataset_collate, 
+                                            worker_init_fn=partial(worker_init_fn, rank=0, seed=seed))
 
                 UnFreeze_flag = True
                 
